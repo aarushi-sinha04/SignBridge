@@ -1,5 +1,5 @@
 import { useState, useRef } from 'react';
-import micIcon from '/Users/aarushisinha/Desktop/CP/project/SignBridge/assets/mic3.png';
+import micIcon from '/assets/mic3.png';
 import { getVideoPath } from '../utils/videoUtils';
 
 const Animation = () => {
@@ -318,12 +318,15 @@ const Animation = () => {
             <video
               ref={videoRef}
               className="w-full h-full object-cover"
-              onEnded={handleVideoEnd}
-              playsInline
+              controls
               preload="auto"
-            >
-              Your browser does not support HTML5 video.
-            </video>
+              crossOrigin="anonymous"
+              onError={(e) => {
+                console.error('Video error:', e.target.error);
+                console.error('Video source:', e.target.src);
+              }}
+              onEnded={handleVideoEnd}
+            />
           </div>
         </div>
       </div>

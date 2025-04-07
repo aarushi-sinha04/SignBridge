@@ -2,7 +2,7 @@
 
 import React, { useRef, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import helloVideo from '/Users/aarushisinha/Desktop/CP/project/SignBridge/assets/Hello.mp4';
+import helloVideo from '/assets/Hello.mp4';
 
 const Home = () => {
   const videoRef = useRef(null);

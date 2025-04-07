@@ -115,4 +115,9 @@ export const useAuth = () => {
     throw new Error('useAuth must be used within an AuthProvider');
   }
   return context;
+};
+
+export const getVideoPath = async (word) => {
+  const fileName = `${word}.mp4`;
+  return `/assets/${fileName}`;
 }; 

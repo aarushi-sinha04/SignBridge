@@ -2,109 +2,119 @@ const express = require('express');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const cors = require('cors');
+const mongoose = require('mongoose');
+require('dotenv').config();
 
 const app = express();
 const PORT = process.env.PORT || 8000;
-const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key'; // In production, use environment variable
+const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key';
 
-// In-memory user storage (replace with a database in production)
-const users = [];
-const userProgress = {};
-
+// Middleware
 app.use(cors());
 app.use(express.json());
 
-// Middleware to verify JWT token
-const verifyToken = (req, res, next) => {
-  const token = req.headers.authorization?.split(' ')[1];
-  
-  if (!token) {
-    return res.status(401).json({ message: 'No token provided' });
-  }
+// Connect to MongoDB
+mongoose.connect(process.env.MONGODB_URI || 'mongodb://localhost:27017/signbridge', {
+  useNewUrlParser: true,
+  useUnifiedTopology: true,
+})
+.then(() => console.log('Connected to MongoDB'))
+.catch(err => console.error('MongoDB connection error:', err));
 
-  try {
-    const decoded = jwt.verify(token, JWT_SECRET);
-    req.userId = decoded.userId;
-    next();
-  } catch (error) {
-    res.status(401).json({ message: 'Invalid token' });
+// User Schema
+const userSchema = new mongoose.Schema({
+  username: { type: String, required: true, unique: true },
+  email: { type: String, required: true, unique: true },
+  password: { type: String, required: true },
+  progress: {
+    level: { type: Number, default: 1 },
+    score: { type: Number, default: 0 },
+    completedLessons: [{ type: String }],
+    currentLesson: { type: String, default: '' },
+    achievements: [{ type: String }],
+    lastActive: { type: Date, default: Date.now }
   }
-};
+});
 
-// Signup endpoint
-app.post('/api/signup', async (req, res) => {
+const User = mongoose.model('User', userSchema);
+
+// Routes
+app.post('/api/auth/register', async (req, res) => {
   try {
     const { username, email, password } = req.body;
-
+    
     // Check if user already exists
-    if (users.find(u => u.username === username || u.email === email)) {
-      return res.status(400).json({ message: 'Username or email already exists' });
+    const existingUser = await User.findOne({ $or: [{ email }, { username }] });
+    if (existingUser) {
+      return res.status(400).json({ message: 'User already exists' });
     }
 
     // Hash password
     const hashedPassword = await bcrypt.hash(password, 10);
 
     // Create new user
-    const user = {
-      id: users.length + 1,
+    const user = new User({
       username,
       email,
       password: hashedPassword
-    };
+    });
 
-    users.push(user);
+    await user.save();
 
-    // Initialize user progress
-    userProgress[user.id] = {
-      streak: 0,
-      totalPoints: 0,
-      levelProgress: {
-        1: 0, // Alphabets
-        2: 0, // Words
-        3: 0  // Sentences
-      },
-      dailyGoals: {
-        completed: 0,
-        total: 5
-      }
-    };
-
-    // Create token
-    const token = jwt.sign({ userId: user.id }, JWT_SECRET, { expiresIn: '24h' });
+    // Generate JWT
+    const token = jwt.sign({ userId: user._id }, JWT_SECRET, { expiresIn: '24h' });
 
     res.status(201).json({
+      message: 'User created successfully',
       token,
-      user: { id: user.id, username: user.username, email: user.email }
+      user: {
+        id: user._id,
+        username: user.username,
+        email: user.email,
+        progress: user.progress
+      }
     });
   } catch (error) {
-    console.error('Signup error:', error);
+    console.error('Registration error:', error);
     res.status(500).json({ message: 'Error creating user' });
   }
 });
 
-// Login endpoint
 app.post('/api/auth/login', async (req, res) => {
   try {
     const { username, password } = req.body;
+    console.log('Login attempt for username:', username);
 
     // Find user
-    const user = users.find(u => u.username === username);
+    const user = await User.findOne({ username });
+    console.log('User found:', user ? 'Yes' : 'No');
+
     if (!user) {
+      console.log('User not found');
       return res.status(401).json({ message: 'Invalid credentials' });
     }
 
     // Check password
-    const validPassword = await bcrypt.compare(password, user.password);
-    if (!validPassword) {
+    const isPasswordValid = await bcrypt.compare(password, user.password);
+    console.log('Password valid:', isPasswordValid);
+
+    if (!isPasswordValid) {
+      console.log('Invalid password');
       return res.status(401).json({ message: 'Invalid credentials' });
     }
 
-    // Create token
-    const token = jwt.sign({ userId: user.id }, JWT_SECRET, { expiresIn: '24h' });
+    // Generate JWT
+    const token = jwt.sign({ userId: user._id }, JWT_SECRET, { expiresIn: '24h' });
+    console.log('Login successful for user:', username);
 
     res.json({
       token,
-      user: { id: user.id, username: user.username, email: user.email }
+      user: {
+        id: user._id,
+        username: user.username,
+        email: user.email,
+        progress: user.progress
+      }
     });
   } catch (error) {
     console.error('Login error:', error);
@@ -112,92 +122,83 @@ app.post('/api/auth/login', async (req, res) => {
   }
 });
 
-// Get user progress
-app.get('/api/progress', verifyToken, (req, res) => {
-  try {
-    const progress = userProgress[req.userId];
-    if (!progress) {
-      return res.status(404).json({ message: 'Progress not found' });
-    }
-    res.json(progress);
-  } catch (error) {
-    console.error('Progress fetch error:', error);
-    res.status(500).json({ message: 'Error fetching progress' });
+// Protected route middleware
+const authenticateToken = (req, res, next) => {
+  const authHeader = req.headers['authorization'];
+  const token = authHeader && authHeader.split(' ')[1];
+
+  if (!token) {
+    return res.status(401).json({ message: 'No token provided' });
   }
-});
 
-// Update user progress
-app.post('/api/progress', verifyToken, (req, res) => {
+  jwt.verify(token, JWT_SECRET, (err, user) => {
+    if (err) {
+      return res.status(403).json({ message: 'Invalid token' });
+    }
+    req.user = user;
+    next();
+  });
+};
+
+// Update progress endpoint
+app.post('/api/user/progress', authenticateToken, async (req, res) => {
   try {
-    const { levelId, points } = req.body;
-    const progress = userProgress[req.userId];
-    
-    if (!progress) {
-      return res.status(404).json({ message: 'Progress not found' });
+    const { level, score, completedLesson, achievement } = req.body;
+    const user = await User.findById(req.user.userId);
+
+    if (!user) {
+      return res.status(404).json({ message: 'User not found' });
     }
 
-    // Update level progress
-    if (levelId) {
-      progress.levelProgress[levelId] = Math.min(100, progress.levelProgress[levelId] + points);
+    // Update progress fields if provided
+    if (level) user.progress.level = level;
+    if (score) user.progress.score = score;
+    if (completedLesson) {
+      if (!user.progress.completedLessons.includes(completedLesson)) {
+        user.progress.completedLessons.push(completedLesson);
+      }
+    }
+    if (achievement) {
+      if (!user.progress.achievements.includes(achievement)) {
+        user.progress.achievements.push(achievement);
+      }
     }
 
-    // Update total points
-    progress.totalPoints += points;
+    user.progress.lastActive = Date.now();
+    await user.save();
 
-    // Update daily goals
-    progress.dailyGoals.completed = Math.min(progress.dailyGoals.total, progress.dailyGoals.completed + 1);
-
-    res.json(progress);
+    res.json({ 
+      message: 'Progress updated successfully',
+      progress: user.progress 
+    });
   } catch (error) {
-    console.error('Progress update error:', error);
+    console.error('Error updating progress:', error);
     res.status(500).json({ message: 'Error updating progress' });
   }
 });
 
-// Get practice content
-app.get('/api/practice/:levelId', verifyToken, (req, res) => {
+// Get detailed progress endpoint
+app.get('/api/user/progress', authenticateToken, async (req, res) => {
   try {
-    const { levelId } = req.params;
-    const content = {
-      1: {
-        title: 'Alphabets',
-        items: [
-          { sign: 'A', video: 'A.mp4', description: 'Make a fist with your thumb sticking out' },
-          { sign: 'B', video: 'B.mp4', description: 'Hold your hand flat with fingers together' },
-          { sign: 'C', video: 'C.mp4', description: 'Form a C shape with your hand' },
-          { sign: 'D', video: 'D.mp4', description: 'Point your index finger up' },
-          { sign: 'E', video: 'E.mp4', description: 'Make a fist with your thumb across fingers' }
-        ]
-      },
-      2: {
-        title: 'Words',
-        items: [
-          { sign: 'Hello', video: 'Hello.mp4', description: 'Wave your hand' },
-          { sign: 'Thank You', video: 'ThankYou.mp4', description: 'Touch your chin and move forward' },
-          { sign: 'Please', video: 'Please.mp4', description: 'Rub your chest in a circular motion' },
-          { sign: 'Sorry', video: 'Sorry.mp4', description: 'Make a fist and rub your chest' },
-          { sign: 'Goodbye', video: 'Goodbye.mp4', description: 'Wave your hand' }
-        ]
-      },
-      3: {
-        title: 'Sentences',
-        items: [
-          { sign: 'How are you?', video: 'HowAreYou.mp4', description: 'Combination of signs' },
-          { sign: 'My name is...', video: 'MyNameIs.mp4', description: 'Combination of signs' },
-          { sign: 'Nice to meet you', video: 'NiceToMeetYou.mp4', description: 'Combination of signs' },
-          { sign: 'I love you', video: 'ILoveYou.mp4', description: 'Combination of signs' },
-          { sign: 'What is your name?', video: 'WhatIsYourName.mp4', description: 'Combination of signs' }
-        ]
+    const user = await User.findById(req.user.userId);
+    if (!user) {
+      return res.status(404).json({ message: 'User not found' });
+    }
+    res.json({ 
+      progress: user.progress,
+      user: {
+        id: user._id,
+        username: user.username,
+        email: user.email
       }
-    };
-
-    res.json(content[levelId] || content[1]);
+    });
   } catch (error) {
-    console.error('Practice content error:', error);
-    res.status(500).json({ message: 'Error fetching practice content' });
+    console.error('Error fetching progress:', error);
+    res.status(500).json({ message: 'Error fetching progress' });
   }
 });
 
+// Start server
 app.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`);
 }); 

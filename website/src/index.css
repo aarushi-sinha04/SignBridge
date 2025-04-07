@@ -1,0 +1,282 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Montserrat:wght@500;600;700&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --neon-primary: #00ff9d;
+  --neon-secondary: #00b8ff;
+  --neon-accent: #ff00ff;
+  --bg-dark: #0a0a0a;
+  --bg-darker: #050505;
+}
+
+@layer base {
+  body {
+    @apply bg-[#0a0a0a] text-white font-inter;
+    background: linear-gradient(135deg, var(--bg-dark) 0%, var(--bg-darker) 100%);
+  }
+
+  h1, h2, h3, h4, h5, h6 {
+    @apply font-montserrat;
+  }
+}
+
+@layer components {
+  .glass-card {
+    @apply bg-black/40 backdrop-blur-xl p-8 rounded-2xl border border-white/10 shadow-xl;
+    animation: cardAppear 0.6s ease-out;
+    box-shadow: 0 0 20px rgba(0, 255, 157, 0.1);
+    transition: all 0.3s ease;
+  }
+
+  .glass-card:hover {
+    box-shadow: 0 0 30px rgba(0, 255, 157, 0.2);
+    border-color: rgba(0, 255, 157, 0.3);
+  }
+
+  .btn-primary {
+    @apply px-6 py-3 rounded-xl font-semibold transition-all duration-300;
+    background: linear-gradient(45deg, var(--neon-primary), var(--neon-secondary));
+    box-shadow: 0 0 15px rgba(0, 255, 157, 0.3);
+    position: relative;
+    overflow: hidden;
+  }
+
+  .btn-primary:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 0 25px rgba(0, 255, 157, 0.5);
+  }
+
+  .btn-primary::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: -100%;
+    width: 100%;
+    height: 100%;
+    background: linear-gradient(
+      90deg,
+      transparent,
+      rgba(255, 255, 255, 0.2),
+      transparent
+    );
+    transition: 0.5s;
+  }
+
+  .btn-primary:hover::before {
+    left: 100%;
+  }
+
+  .input-primary {
+    @apply w-full bg-black/40 text-white border border-white/10 
+           rounded-xl px-4 py-3 focus:outline-none;
+    transition: all 0.3s ease;
+  }
+
+  .input-primary:focus {
+    border-color: var(--neon-primary);
+    box-shadow: 0 0 15px rgba(0, 255, 157, 0.2);
+  }
+
+  .nav-link {
+    @apply relative px-4 py-2 text-sm font-medium rounded-xl transition-all 
+           duration-300 text-white/80 hover:text-white;
+  }
+
+  .nav-link::after {
+    @apply content-[''] absolute bottom-0 left-1/2 -translate-x-1/2 h-0.5 
+           transition-all duration-300;
+    width: 0;
+    background: linear-gradient(90deg, var(--neon-primary), var(--neon-secondary));
+  }
+
+  .nav-link:hover::after {
+    width: 80%;
+    box-shadow: 0 0 10px var(--neon-primary);
+  }
+
+  .nav-link.active::after {
+    width: 80%;
+    box-shadow: 0 0 10px var(--neon-primary);
+  }
+
+  .word-item {
+    @apply relative;
+  }
+
+  .word-item.active-word {
+    @apply text-[#00ff9d] font-semibold scale-110;
+    animation: wordPulse 1s ease-in-out infinite;
+    text-shadow: 0 0 10px var(--neon-primary);
+  }
+
+  .word-item.active-word::before {
+    content: '';
+    @apply absolute -inset-2 rounded-lg -z-10;
+    background: rgba(0, 255, 157, 0.1);
+    box-shadow: 0 0 15px rgba(0, 255, 157, 0.2);
+  }
+
+  .particle {
+    @apply absolute rounded-full bg-accent-primary/20 pointer-events-none;
+    animation: float 20s ease-in-out infinite;
+  }
+}
+
+@keyframes cardAppear {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes wordPulse {
+  0% {
+    text-shadow: 0 0 10px var(--neon-primary);
+  }
+  50% {
+    text-shadow: 0 0 20px var(--neon-primary);
+  }
+  100% {
+    text-shadow: 0 0 10px var(--neon-primary);
+  }
+}
+
+/* Neon text effect */
+.neon-text {
+  text-shadow: 0 0 5px var(--neon-primary),
+               0 0 10px var(--neon-primary),
+               0 0 20px var(--neon-primary);
+}
+
+/* Gradient text effect */
+.gradient-text {
+  background: linear-gradient(45deg, var(--neon-primary), var(--neon-secondary), var(--neon-accent));
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  animation: gradientFlow 3s ease infinite;
+}
+
+@keyframes gradientFlow {
+  0% {
+    background-position: 0% 50%;
+  }
+  50% {
+    background-position: 100% 50%;
+  }
+  100% {
+    background-position: 0% 50%;
+  }
+}
+
+@keyframes gradient {
+  0% { background-position: 0% 50%; }
+  50% { background-position: 100% 50%; }
+  100% { background-position: 0% 50%; }
+}
+
+@keyframes float {
+  0% { transform: translateY(0px) rotate(0deg); }
+  50% { transform: translateY(-10px) rotate(1deg); }
+  100% { transform: translateY(0px) rotate(0deg); }
+}
+
+@keyframes shine {
+  0% { background-position: 200% center; }
+  100% { background-position: -200% center; }
+}
+
+.animate-shine {
+  background: linear-gradient(90deg, 
+    transparent 0%, 
+    rgba(255,255,255,0.1) 50%, 
+    transparent 100%
+  );
+  background-size: 200% auto;
+  animation: shine 3s linear infinite;
+}
+
+@keyframes pulse {
+  0% { box-shadow: 0 0 0 0 var(--accent-glow); }
+  70% { box-shadow: 0 0 0 10px rgba(110, 86, 207, 0); }
+  100% { box-shadow: 0 0 0 0 rgba(110, 86, 207, 0); }
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+:root {
+  font-family: system-ui, Avenir, Helvetica, Arial, sans-serif;
+  line-height: 1.5;
+  font-weight: 400;
+
+  color-scheme: light dark;
+  color: rgba(255, 255, 255, 0.87);
+  background-color: #242424;
+
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+a {
+  font-weight: 500;
+  color: #646cff;
+  text-decoration: inherit;
+}
+a:hover {
+  color: #535bf2;
+}
+
+h1 {
+  font-size: 3.2em;
+  line-height: 1.1;
+}
+
+button {
+  border-radius: 8px;
+  border: 1px solid transparent;
+  padding: 0.6em 1.2em;
+  font-size: 1em;
+  font-weight: 500;
+  font-family: inherit;
+  background-color: #1a1a1a;
+  cursor: pointer;
+  transition: border-color 0.25s;
+}
+button:hover {
+  border-color: #646cff;
+}
+button:focus,
+button:focus-visible {
+  outline: 4px auto -webkit-focus-ring-color;
+}
+
+@media (prefers-color-scheme: light) {
+  :root {
+    color: #213547;
+    background-color: #ffffff;
+  }
+  a:hover {
+    color: #747bff;
+  }
+  button {
+    background-color: #f9f9f9;
+  }
+}

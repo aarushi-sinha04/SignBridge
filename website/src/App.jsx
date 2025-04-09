@@ -13,6 +13,9 @@ import Practice from './components/Practice';
 import PrivateRoute from './components/PrivateRoute';
 import { AuthProvider } from './context/AuthContext';
 import { ProgressProvider } from './context/ProgressContext';
+import HomePage from './components/HomePage';
+import GamePage from './components/GamePage';
+import './App.css';
 
 function App() {
   return (
@@ -21,7 +24,7 @@ function App() {
         <ProgressProvider>
           <Layout>
             <Routes>
-              <Route path="/" element={<Home />} />
+              <Route path="/" element={<HomePage />} />
               <Route path="/login" element={<Login />} />
               <Route path="/signup" element={<Signup />} />
               <Route path="/about" element={<About />} />
@@ -66,6 +69,7 @@ function App() {
                   </PrivateRoute>
                 } 
               />
+              <Route path="/game" element={<GamePage />} />
               <Route path="*" element={<Navigate to="/" replace />} />
             </Routes>
           </Layout>

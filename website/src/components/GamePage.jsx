@@ -13,7 +13,7 @@ const GamePage = () => {
   const [message, setMessage] = useState('');
   const [isCorrect, setIsCorrect] = useState(null);
   const [capturedFrames, setCapturedFrames] = useState([]);
-  const [timer, setTimer] = useState(30);
+  const [showWord, setShowWord] = useState(true);
   const [isGameActive, setIsGameActive] = useState(false);
   const [level, setLevel] = useState(1);
 
@@ -27,18 +27,14 @@ const GamePage = () => {
   };
 
   useEffect(() => {
-    let interval;
-    if (isGameActive && timer > 0) {
-      interval = setInterval(() => {
-        setTimer((prev) => prev - 1);
-      }, 1000);
-    } else if (timer === 0) {
-      stopRecording();
-      getNewWord();
-      setTimer(30);
+    let frameInterval;
+    if (isRecording) {
+      frameInterval = setInterval(captureFrame, 100);
     }
-    return () => clearInterval(interval);
-  }, [isGameActive, timer]);
+    return () => {
+      if (frameInterval) clearInterval(frameInterval);
+    };
+  }, [isRecording]);
 
   const startCamera = async () => {
     try {
@@ -65,7 +61,6 @@ const GamePage = () => {
   const startGame = () => {
     setIsGameActive(true);
     setScore(0);
-    setTimer(30);
     getNewWord();
     startCamera();
   };
@@ -74,11 +69,15 @@ const GamePage = () => {
     const content = contentLists[level];
     const randomIndex = Math.floor(Math.random() * content.length);
     setCurrentWord(content[randomIndex]);
+    setShowWord(true);
+    setIsRecording(false);
+    setCapturedFrames([]);
     setMessage('');
     setIsCorrect(null);
   };
 
   const startRecording = () => {
+    setShowWord(false);
     setIsRecording(true);
     setCapturedFrames([]);
     setMessage(`Recording... Show the sign for: ${currentWord}`);
@@ -86,8 +85,20 @@ const GamePage = () => {
 
   const stopRecording = async () => {
     setIsRecording(false);
-    if (capturedFrames.length > 0) {
-      await checkSign();
+    if (level === 1) {
+      // For alphabet, we only need one frame
+      if (capturedFrames.length > 0) {
+        await checkSign();
+      } else {
+        setMessage('No frame captured. Please try again.');
+      }
+    } else {
+      // For words, we need multiple frames
+      if (capturedFrames.length >= 30) {
+        await checkSign();
+      } else {
+        setMessage(`Need ${30 - capturedFrames.length} more frames. Please try again.`);
+      }
     }
   };
 
@@ -95,18 +106,20 @@ const GamePage = () => {
     if (webcamRef.current && isRecording) {
       const imageSrc = webcamRef.current.getScreenshot();
       if (imageSrc) {
-        setCapturedFrames((prev) => [...prev, imageSrc]);
+        if (level === 1) {
+          // For alphabet, only keep the latest frame
+          setCapturedFrames([imageSrc]);
+        } else {
+          // For words, keep accumulating frames
+          setCapturedFrames((prev) => [...prev, imageSrc]);
+        }
       }
     }
   };
 
-  useEffect(() => {
-    let frameInterval;
-    if (isRecording) {
-      frameInterval = setInterval(captureFrame, 100); // Capture every 100ms
-    }
-    return () => clearInterval(frameInterval);
-  }, [isRecording]);
+  const skipWord = () => {
+    getNewWord();
+  };
 
   const checkSign = async () => {
     try {
@@ -124,10 +137,7 @@ const GamePage = () => {
       }
 
       const data = await response.json();
-      console.log('Sign data:', data);
       const prediction = data?.prediction?.toUpperCase();
-      console.log('Prediction:', prediction);
-      console.log('Current Word:', currentWord);
       const isCorrectPrediction = prediction === currentWord.toUpperCase();
       
       setIsCorrect(isCorrectPrediction);
@@ -141,8 +151,7 @@ const GamePage = () => {
       // Move to next word after a delay
       setTimeout(() => {
         getNewWord();
-        setTimer(300);
-      }, 20000);
+      }, 2000);
     } catch (error) {
       console.error('Error checking sign:', error);
       setMessage('Error checking sign. Please try again.');
@@ -150,21 +159,28 @@ const GamePage = () => {
   };
 
   return (
-    <div className="min-h-screen bg-gray-100 p-8">
-      <div className="max-w-4xl mx-auto">
+    <div className="min-h-screen p-8">
+      <div className="max-w-6xl mx-auto">
         <div className="text-center mb-8">
-          <h1 className="text-4xl font-bold text-gray-800 mb-4">Sign Language Game</h1>
-          <p className="text-xl text-gray-600">Level {level} - {level === 1 ? 'Alphabets' : 'Words'}</p>
+          <h1 className="text-4xl font-bold text-whitemb-4">Sign Language Game</h1>
+          <p className="text-xl text-white/80">Level {level} - {level === 1 ? 'Alphabets' : 'Words'}</p>
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+          {/* Camera Box */}
           <Card className="p-6">
             <div className="aspect-video mb-4">
-              <Webcam
-                ref={webcamRef}
-                screenshotFormat="image/jpeg"
-                className="w-full h-full object-cover rounded-lg"
-              />
+              {isGameActive ? (
+                <Webcam
+                  ref={webcamRef}
+                  screenshotFormat="image/jpeg"
+                  className="w-full h-full object-cover rounded-lg"
+                />
+              ) : (
+                <div className="w-full h-full bg-gray-200 rounded-lg flex items-center justify-center">
+                  <p className="text-gray-500">Camera will start when game begins</p>
+                </div>
+              )}
             </div>
             
             {!isGameActive ? (
@@ -173,20 +189,6 @@ const GamePage = () => {
               </Button>
             ) : (
               <div className="space-y-4">
-                <div className="flex justify-between items-center">
-                  <span className="text-2xl font-bold">Score: {score}</span>
-                  <span className="text-xl">Time: {timer}s</span>
-                </div>
-                
-                <div className="text-center">
-                  <h2 className="text-3xl font-bold mb-4">{currentWord}</h2>
-                  {message && (
-                    <p className={`text-lg ${isCorrect ? 'text-green-600' : 'text-red-600'}`}>
-                      {message}
-                    </p>
-                  )}
-                </div>
-
                 <div className="flex gap-4">
                   {!isRecording ? (
                     <Button onClick={startRecording} className="flex-1">
@@ -198,21 +200,48 @@ const GamePage = () => {
                     </Button>
                   )}
                 </div>
+                {message && (
+                  <div className={`text-center p-4 rounded-lg ${
+                    isCorrect === true ? 'bg-green-100 text-green-800' :
+                    isCorrect === false ? 'bg-red-100 text-red-800' :
+                    'bg-yellow-100 text-yellow-800'
+                  }`}>
+                    {message}
+                  </div>
+                )}
               </div>
             )}
           </Card>
 
+          {/* Word Box */}
           <Card className="p-6">
-            <h2 className="text-2xl font-semibold mb-4">Instructions</h2>
-            <ul className="space-y-2 text-gray-600">
-              <li>• Click "Start Game" to begin</li>
-              <li>• Position yourself in front of the camera</li>
-              <li>• When you see {level === 1 ? 'an alphabet' : 'a word'}, click "Start Recording"</li>
-              <li>• Show the sign for {level === 1 ? 'the alphabet' : 'the word'}</li>
-              <li>• Click "Stop Recording" when done</li>
-              <li>• You have 30 seconds for each attempt</li>
-              <li>• Earn 10 points for each correct sign</li>
-            </ul>
+            <div className="space-y-6">
+              <div className="flex justify-between items-center">
+                <div className="text-2xl font-bold">Score: {score}</div>
+                {isGameActive && (
+                  <Button onClick={skipWord} variant="outline">Skip Word</Button>
+                )}
+              </div>
+
+              {isGameActive ? (
+                <div className="text-center space-y-4">
+                  <h2 className="text-2xl font-bold">Show this sign:</h2>
+                  <div className="text-6xl font-bold text-blue-600">{currentWord}</div>
+                </div>
+              ) : (
+                <div className="text-center space-y-4">
+                  <h2 className="text-2xl font-bold">Instructions</h2>
+                  <ul className="space-y-2 text-gray-600 text-left">
+                    <li>• Click "Start Game" to begin</li>
+                    <li>• Position yourself in front of the camera</li>
+                    <li>• When you see {level === 1 ? 'an alphabet' : 'a word'}, click "Start Recording"</li>
+                    <li>• Show the sign for {level === 1 ? 'the alphabet' : 'the word'}</li>
+                    <li>• Click "Stop Recording" when done</li>
+                    <li>• Earn 10 points for each correct sign</li>
+                  </ul>
+                </div>
+              )}
+            </div>
           </Card>
         </div>
       </div>

@@ -14,8 +14,8 @@ const HomePage = () => {
           <p className="text-xl text-white">Learn and practice sign language in a fun way!</p>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-          <Card className="p-6">
+       
+          {/* <Card className="p-6">
             <h2 className="text-2xl font-semibold text-gray-800 mb-4">Learn Signs</h2>
             <p className="text-gray-600 mb-6">
               Start learning sign language with our interactive lessons and practice sessions.
@@ -23,7 +23,7 @@ const HomePage = () => {
             <Button onClick={() => navigate('/game')} className="w-full">
               Start Learning
             </Button>
-          </Card>
+          </Card> */}
 
           <Card className="p-6">
             <h2 className="text-2xl font-semibold text-gray-800 mb-4">Practice Game</h2>
@@ -34,7 +34,7 @@ const HomePage = () => {
               Play Game
             </Button>
           </Card>
-        </div>
+       
       </div>
     </div>
   );

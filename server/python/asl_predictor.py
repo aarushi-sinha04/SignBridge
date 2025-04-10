@@ -83,8 +83,7 @@ class ASLPredictor:
         # Load models
         try:
             # Load alphabet model
-            
-            alphabet_model_path = os.path.join(model_dir, 'cnn_model_keras2.h5')
+            alphabet_model_path = os.path.join(model_dir, 'asl_alphabet_model.h5')
             
 
             try:
@@ -102,7 +101,6 @@ class ASLPredictor:
             except Exception as e:
                 print(f"Error loading alphabet model: {str(e)}")
                 raise
-
             
             # Load word model
             word_model_path = os.path.join(model_dir, 'asl_lstm_model.h5')
@@ -163,111 +161,37 @@ class ASLPredictor:
         landmarks /= np.ptp(landmarks)  # ptp = max - min
 
         return landmarks
-    
 
-   
     def predict_alphabet(self, frame):
-        # Save the input frame (optional, for debugging)
         cv2.imwrite("input_frame.jpg", frame)
 
-        # Convert to grayscale
-        gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+        landmarks = self.preprocess_frame(frame)
+        if landmarks is None:
+            print("No hand detected in the frame")
+            return None
+            
+        # Reshape for model input
+        landmarks = landmarks.reshape(1, 1, -1)
+        print("Alphabet landmarks shape:", landmarks.shape)
 
-        # Resize to match model input size
-        resized = cv2.resize(gray, (50, 50))  # or (28, 28) if that’s your training size
-
-        # Normalize and reshape for model input
-        input_img = resized.reshape(1, 50, 50, 1).astype('float32') / 255.0
-
-        print("✅ Input image shape:", input_img.shape)
-
-        # Labels
-        alphabet_labels = [
-        'A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M', 'N', 'O', 'P', 'Q', 'R', 'S', 'T', 'U', 'V', 'W', 'X', 'Y', 'Z',
-        '0', '1', '2', '3', '4', '5', '6', '7', '8', '9',
-        'space', 'del', 'nothing', 'additional_gesture_1', 'additional_gesture_2', 'additional_gesture_3', 'additional_gesture_4'
-        ]
-
-
-        # Predict
+        
+        # Make prediction
         try:
-            prediction = self.alphabet_model.predict(input_img)
-            print("📈 Prediction output:", prediction)
-
+            prediction = self.alphabet_model.predict(landmarks)
+            print("Prediction output:", prediction)
             predicted_class = np.argmax(prediction)
 
-            if predicted_class < len(alphabet_labels):
-                predicted_label = alphabet_labels[predicted_class]
-                print("✅ Predicted label:", predicted_label)
-                return predicted_label
-            else:
-                print("⚠️ Invalid predicted index")
-                return None
+            alphabet_labels = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 
+                            'L', 'M', 'N', 'O', 'P', 'Q', 'R', 'S', 'T', 'U', 'V', 
+                            'W', 'X', 'Y', 'Z', 'space', 'del', 'nothing']
+            print("Predicted class:", predicted_class)
+            print("Predicted label:", alphabet_labels[predicted_class])
 
+            return alphabet_labels[predicted_class]
+        
         except Exception as e:
-            print(f"❌ Prediction error: {e}")
+            print(f"Prediction error: {e}")
             return None
-
-
-
-
-
-
-# original
-    # def predict_alphabet(self, frame):
-    #     cv2.imwrite("input_frame.jpg", frame)
-
-    #     landmarks = self.preprocess_frame(frame)
-    #     if landmarks is None:
-    #         print("No hand detected in the frame")
-    #         return None
-            
-    #     # Reshape for model input
-    #     landmarks = landmarks.reshape(1, 1, -1)
-    #     print("Alphabet landmarks shape:", landmarks.shape)
-
-        
-    #     # Make prediction
-    #     try:
-    #         prediction = self.alphabet_model.predict(landmarks)
-    #         print("Prediction output:", prediction)
-    #         predicted_class = np.argmax(prediction)
-
-    #         alphabet_labels = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 
-    #                         'L', 'M', 'N', 'O', 'P', 'Q', 'R', 'S', 'T', 'U', 'V', 
-    #                         'W', 'X', 'Y', 'Z', 'space', 'del', 'nothing']
-    #         print("Predicted class:", predicted_class)
-    #         print("Predicted label:", alphabet_labels[predicted_class])
-
-    #         return alphabet_labels[predicted_class]
-        
-    #     except Exception as e:
-    #         print(f"Prediction error: {e}")
-    #         return None
-
-    # def predict_alphabet(self, frame):
-    #     # Convert to grayscale
-    #     gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
-        
-    #     # Resize to match model input size
-    #     resized = cv2.resize(gray, (28, 28))
-
-    #     # Normalize and reshape to match model input shape (1, 28, 28, 1)
-    #     reshaped = resized.reshape(1, 28, 28, 1).astype('float32') / 255.0
-
-    #     # Predict
-    #     prediction = self.alphabet_model.predict(reshaped)
-    #     predicted_class = np.argmax(prediction)
-
-    #     # Corrected label list
-    #     alphabet_labels = [
-    #         'A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M',
-    #         'N', 'O', 'P', 'Q', 'R', 'S', 'T', 'U', 'V', 'W', 'X', 'Y', 'Z',
-    #         'space', 'del', 'nothing'
-    #     ]
-
-    #     return alphabet_labels[predicted_class]
-
 
     def predict_word(self, frames):
         # Preprocess frames

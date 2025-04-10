@@ -67,7 +67,7 @@ const Learn = () => {
                     </div>
                   ) : (
                     <Link
-                      to={`/learn/level${level.id}`}
+                      to="/HomePage"
                       className="btn-primary w-full text-center"
                     >
                       Start Learning

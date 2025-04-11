@@ -19,8 +19,7 @@ const GamePage = () => {
 
   // Level-based content lists
   const contentLists = {
-    1: ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M', 
-        'N', 'O', 'P', 'Q', 'R', 'S', 'T', 'U', 'V', 'W', 'X', 'Y', 'Z'],
+    1: ['A', 'B', 'C', 'D', 'E', 'F'],
     2: ['hello', 'thank you', 'goodbye', 'yes', 'no'],
     3: ['please', 'sorry', 'help', 'water', 'food'],
     4: ['friend', 'family', 'home', 'school', 'work']

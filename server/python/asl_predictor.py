@@ -181,45 +181,44 @@ class ASLPredictor:
             print("Prediction output:", prediction)
             predicted_class = np.argmax(prediction)
 
-            alphabet_labels = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 
-                            'L', 'M', 'N', 'O', 'P', 'Q', 'R', 'S', 'T', 'U', 'V', 
-                            'W', 'X', 'Y', 'Z', 'space', 'del', 'nothing']
-            print("Predicted class:", predicted_class)
-            print("Predicted label:", alphabet_labels[predicted_class])
+            predicted_index = np.argmax(prediction)
+            predicted_label = self.label_encoder.inverse_transform([predicted_index])[0]
+            return predicted_label
 
-            return alphabet_labels[predicted_class]
+
+   
         
         except Exception as e:
             print(f"Prediction error: {e}")
             return None
 
-    def predict_word(self, frames):
-        # Preprocess frames
-        landmarks = []
-        for frame in frames:
-            frame_landmarks = self.preprocess_frame(frame)
-            if frame_landmarks is not None:
-                landmarks.append(frame_landmarks)
+    # def predict_word(self, frames):
+    #     # Preprocess frames
+    #     landmarks = []
+    #     for frame in frames:
+    #         frame_landmarks = self.preprocess_frame(frame)
+    #         if frame_landmarks is not None:
+    #             landmarks.append(frame_landmarks)
         
-        if not landmarks:
-            return None
+    #     if not landmarks:
+    #         return None
             
-        # Pad or truncate to 30 frames
-        landmarks = np.array(landmarks)
-        if len(landmarks) < 30:
-            landmarks = np.pad(landmarks, ((0, 30 - len(landmarks)), (0, 0)))
-        else:
-            landmarks = landmarks[:30]
+    #     # Pad or truncate to 30 frames
+    #     landmarks = np.array(landmarks)
+    #     if len(landmarks) < 30:
+    #         landmarks = np.pad(landmarks, ((0, 30 - len(landmarks)), (0, 0)))
+    #     else:
+    #         landmarks = landmarks[:30]
             
-        # Reshape for model input
-        landmarks = landmarks.reshape(1, 30, -1)
+    #     # Reshape for model input
+    #     landmarks = landmarks.reshape(1, 30, -1)
         
-        # Make prediction
-        prediction = self.word_model.predict(landmarks)
-        predicted_class = np.argmax(prediction)
+    #     # Make prediction
+    #     prediction = self.word_model.predict(landmarks)
+    #     predicted_class = np.argmax(prediction)
         
-        # Convert to word using label encoder
-        return self.label_encoder.inverse_transform([predicted_class])[0]
+    #     # Convert to word using label encoder
+    #     return self.label_encoder.inverse_transform([predicted_class])[0]
 
     def release(self):
         self.hands.close() 

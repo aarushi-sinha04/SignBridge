@@ -2,7 +2,14 @@ import React from 'react';
 import { useProgress } from '../context/ProgressContext';
 
 const Progress = () => {
-  const { progress, loading } = useProgress();
+  const { loading } = useProgress(); // Removed unused `progress`
+
+  // Hardcoded values
+  const level = 1;
+  const score = 20;
+  const nextLevelThreshold = 100;
+  const pointsRemaining = nextLevelThreshold - score;
+  const streak = 2;
 
   if (loading) {
     return (
@@ -25,46 +32,30 @@ const Progress = () => {
           <p className="text-xl text-white/80">Track your sign language learning journey</p>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-8 mb-12">
           <div className="glass-card">
-            <h2 className="text-2xl font-bold mb-6">Current Level</h2>
-            <div className="text-4xl font-bold text-neon-primary mb-2">
-              Level {progress?.level || 1}
-            </div>
-            <div className="text-white/80">
-              {progress?.completedLessons?.length || 0} lessons completed
-            </div>
+            <h2 className="text-2xl font-bold mb-4">Current Level</h2>
+            <div className="text-4xl font-bold text-neon-primary mb-2">Level {level}</div>
+            <p className="text-white/80">Need {pointsRemaining} more points to unlock Level 2</p>
           </div>
 
           <div className="glass-card">
-            <h2 className="text-2xl font-bold mb-6">Achievements</h2>
-            <div className="space-y-4">
-              {progress?.achievements?.length > 0 ? (
-                progress.achievements.map((achievement, index) => (
-                  <div key={index} className="flex items-center space-x-3">
-                    <div className="w-2 h-2 rounded-full bg-neon-primary"></div>
-                    <span className="text-white/80">{achievement}</span>
-                  </div>
-                ))
-              ) : (
-                <p className="text-white/60">No achievements yet. Keep learning!</p>
-              )}
-            </div>
+            <h2 className="text-2xl font-bold mb-4">Score</h2>
+            <div className="text-4xl font-bold text-neon-primary mb-2">{score} pts</div>
+            <p className="text-white/80">Keep learning to level up!</p>
           </div>
 
-          <div className="glass-card md:col-span-2">
-            <h2 className="text-2xl font-bold mb-6">Completed Lessons</h2>
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-              {progress?.completedLessons?.length > 0 ? (
-                progress.completedLessons.map((lesson, index) => (
-                  <div key={index} className="bg-black/40 p-4 rounded-lg border border-white/10">
-                    <div className="text-neon-primary font-medium">{lesson}</div>
-                  </div>
-                ))
-              ) : (
-                <p className="text-white/60 col-span-full">No lessons completed yet. Start learning!</p>
-              )}
-            </div>
+          <div className="glass-card">
+            <h2 className="text-2xl font-bold mb-4">Streak</h2>
+            <div className="text-4xl font-bold text-neon-primary mb-2">{streak} days </div>
+            <p className="text-white/80">Consistency is key!</p>
+          </div>
+        </div>
+
+        <div className="glass-card">
+          <h2 className="text-2xl font-bold mb-6">Completed Lessons</h2>
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+            <p className="text-white/60 col-span-full">No lessons completed yet. Start learning!</p>
           </div>
         </div>
       </div>
@@ -72,4 +63,4 @@ const Progress = () => {
   );
 };
 
-export default Progress; 
+export default Progress;

@@ -171,7 +171,7 @@ const Learn = () => {
           ))}
         </div>
 
-        <div className="mt-12 bg-gray-800 rounded-xl shadow-xl p-8 border border-gray-700">
+        {/* <div className="mt-12 bg-gray-800 rounded-xl shadow-xl p-8 border border-gray-700">
           <h2 className="text-2xl font-semibold text-white mb-6">Your Progress</h2>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
             <div className="bg-gray-700 p-6 rounded-lg">
@@ -187,7 +187,7 @@ const Learn = () => {
               <p className="text-3xl font-bold text-purple-400">Level {level}</p>
             </div>
           </div>
-        </div>
+        </div> */}
       </div>
     </div>
   );

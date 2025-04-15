@@ -70,6 +70,16 @@ class ASLPredictor:
             landmarks_array = np.array(landmarks)
             print(f"Initial landmarks shape: {landmarks_array.shape}")
             
+            # Normalize the landmarks
+            # Get min and max values for each coordinate
+            min_vals = np.min(landmarks_array, axis=0)
+            max_vals = np.max(landmarks_array, axis=0)
+            # Avoid division by zero
+            range_vals = np.where(max_vals - min_vals != 0, max_vals - min_vals, 1)
+            # Normalize to [0, 1]
+            landmarks_array = (landmarks_array - min_vals) / range_vals
+            print("Landmarks normalized")
+            
             # Pad or truncate to get exactly 30 frames
             if landmarks_array.shape[0] < 30:
                 # Pad with zeros if we have fewer than 30 frames

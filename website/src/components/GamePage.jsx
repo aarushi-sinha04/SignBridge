@@ -143,6 +143,7 @@ const GamePage = () => {
       if (isCorrectPrediction) {
         setScore((prev) => prev + 10);
         setMessage('Correct! +10 points');
+        await updateScoreInDB();
       } else {
         setMessage(`Incorrect. The sign was for "${currentWord}"`);
       }
@@ -154,6 +155,62 @@ const GamePage = () => {
     } catch (error) {
       console.error('Error checking sign:', error);
       setMessage('Error checking sign. Please try again.');
+    }
+  };
+
+  const updateScoreInDB = async () => {
+    try {
+      console.log('Updating score in DB');
+      const token = localStorage.getItem('authToken');
+      if (!token) {
+        console.error('No token found');
+        return;
+      }
+
+      // Update score by adding 10 points
+      const updateResponse = await fetch('http://localhost:8000/api/user/progress', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({
+          score: 10 // Points to add for each correct word
+        })
+      });
+
+      if (!updateResponse.ok) {
+        const errorData = await updateResponse.json();
+        console.error('Error updating score:', errorData);
+        throw new Error('Failed to update score');
+      }
+
+      const updatedData = await updateResponse.json();
+      console.log('Score update response:', updatedData);
+      
+      // Update local score state with the new score from DB
+      setScore(updatedData.progress.score);
+
+      // Check if we should unlock level 2
+      if (updatedData.progress.score >= 30 && updatedData.progress.level < 2) {
+        // Try to unlock level 2
+        const unlockResponse = await fetch('http://localhost:8000/api/user/unlock-level2', {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${token}`
+          }
+        });
+
+        if (unlockResponse.ok) {
+          setMessage('Congratulations! You have unlocked the Words level!');
+          // Refresh the page to ensure all components update
+          setTimeout(() => {
+            window.location.reload();
+          }, 2000);
+        }
+      }
+    } catch (error) {
+      console.error('Error in updateScoreInDB:', error);
     }
   };
 

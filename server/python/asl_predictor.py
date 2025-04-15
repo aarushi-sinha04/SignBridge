@@ -103,7 +103,7 @@ class ASLPredictor:
                 raise
             
             # Load word model
-            word_model_path = os.path.join(model_dir, 'asl_lstm_model.h5')
+            word_model_path = os.path.join(model_dir, 'asl_word_lstm_model.h5')
             word_model_json_path = os.path.join(model_dir, 'asl_lstm_model.json')
             try:
                 with open(word_model_json_path, 'r') as json_file:
@@ -134,7 +134,7 @@ class ASLPredictor:
             raise
             
         # Load label encoder
-        label_encoder_path = os.path.join(model_dir, 'label_encoder.pkl')
+        label_encoder_path = os.path.join(model_dir, 'label_encoder_word.pkl')
         self.label_encoder = joblib.load(label_encoder_path)
 
     def preprocess_frame(self, frame):
@@ -192,33 +192,53 @@ class ASLPredictor:
             print(f"Prediction error: {e}")
             return None
 
-    # def predict_word(self, frames):
-    #     # Preprocess frames
-    #     landmarks = []
-    #     for frame in frames:
-    #         frame_landmarks = self.preprocess_frame(frame)
-    #         if frame_landmarks is not None:
-    #             landmarks.append(frame_landmarks)
-        
-    #     if not landmarks:
-    #         return None
-            
-    #     # Pad or truncate to 30 frames
-    #     landmarks = np.array(landmarks)
-    #     if len(landmarks) < 30:
-    #         landmarks = np.pad(landmarks, ((0, 30 - len(landmarks)), (0, 0)))
-    #     else:
-    #         landmarks = landmarks[:30]
-            
-    #     # Reshape for model input
-    #     landmarks = landmarks.reshape(1, 30, -1)
-        
-    #     # Make prediction
-    #     prediction = self.word_model.predict(landmarks)
-    #     predicted_class = np.argmax(prediction)
-        
-    #     # Convert to word using label encoder
-    #     return self.label_encoder.inverse_transform([predicted_class])[0]
+    def predict_word(self, frames):
+        print("Running predict_word...")
+        landmarks = []
+
+        for i, frame in enumerate(frames):
+            results = self.hands.process(cv2.cvtColor(frame, cv2.COLOR_BGR2RGB))
+            if results.multi_hand_landmarks:
+                hand_landmarks = results.multi_hand_landmarks[0]
+                landmark_data = []
+                for landmark in hand_landmarks.landmark:
+                    landmark_data.extend([landmark.x, landmark.y, landmark.z])
+                landmarks.append(landmark_data)
+            else:
+                print(f"No hand detected in frame {i}")
+
+        if not landmarks:
+            print("No landmarks detected")
+            return None
+
+        input_data = np.array(landmarks)
+        print(f"Input data shape before reshape: {input_data.shape}")
+
+        try:
+            input_data = input_data.reshape(input_data.shape[0], 1, input_data.shape[1])
+            print(f"Input data shape after reshape: {input_data.shape}")
+
+            prediction = self.word_model.predict(input_data)
+            print(f"Raw model prediction: {prediction}")
+
+            predicted_class = np.argmax(prediction, axis=1)
+            print(f"Predicted class: {predicted_class}")
+
+            from collections import Counter
+            most_common = Counter(predicted_class).most_common(1)
+            final_prediction = most_common[0][0] if most_common else None
+
+            if final_prediction is None:
+                print("Most common prediction not found")
+                return None
+
+            word = self.label_encoder.inverse_transform([final_prediction])[0]
+            print(f"Final word: {word}")
+            return word
+
+        except Exception as e:
+            print(f"Error during model prediction: {e}")
+            return None
 
     def release(self):
         self.hands.close() 

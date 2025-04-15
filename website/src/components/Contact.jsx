@@ -18,7 +18,7 @@ function Contact() {
           </div>
           <div>
             <h3 className="text-text-primary font-semibold mb-2">Address</h3>
-            <p>123 Innovation Street<br />Tech Valley, CA 94025</p>
+            <p>NSUT<br />New Delhi</p>
           </div>
         </div>
       </div>

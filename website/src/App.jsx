@@ -15,6 +15,7 @@ import { AuthProvider } from './context/AuthContext';
 import { ProgressProvider } from './context/ProgressContext';
 import HomePage from './components/HomePage';
 import GamePage from './components/GamePage';
+import WordGamePage from './components/WordGamePage';
 import './App.css';
 
 function App() {
@@ -30,6 +31,7 @@ function App() {
               <Route path="/about" element={<About />} />
               <Route path="/contact" element={<Contact />} />
               <Route path="/HomePage" element={<HomePage />} />
+              {/* <Route path="/learn" element={<Learn />} /> */}
               <Route 
                 path="/learn" 
                 element={
@@ -71,6 +73,7 @@ function App() {
                 } 
               />
               <Route path="/game" element={<GamePage />} />
+              <Route path="/game/words" element={<WordGamePage />} />
               <Route path="*" element={<Navigate to="/" replace />} />
             </Routes>
           </Layout>

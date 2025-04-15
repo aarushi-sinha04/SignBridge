@@ -27,12 +27,18 @@ class ASLPredictor:
             min_detection_confidence=0.5
         )
         
-        # Load the word model
-        model_path = os.path.join('model_words', 'asl_word_lstm_model.h5')
+        # Get the absolute path to the model file
+        current_dir = os.path.dirname(os.path.abspath(__file__))
+        workspace_root = os.path.dirname(os.path.dirname(current_dir))  # Go up two levels to reach workspace root
+        model_path = os.path.join(workspace_root, 'model', 'asl_word_lstm_model.h5')
+        
+        print(f"Looking for model at: {model_path}")  # Debug print
+        
         if not os.path.exists(model_path):
-            raise FileNotFoundError(f"Model file not found at {model_path}")
+            raise FileNotFoundError(f"Model file not found at {model_path}. Please make sure the model file exists in the model directory.")
             
         self.model = load_model(model_path)
+        print("Model loaded successfully")  # Debug print
         
         # Initialize label encoder for words
         self.label_encoder = LabelEncoder()
@@ -57,26 +63,53 @@ class ASLPredictor:
                     landmarks.append(landmark_data)
             
             if not landmarks:
+                print("No landmarks detected")
                 return None
                 
-            # Convert to numpy array and reshape
+            # Convert to numpy array
             landmarks_array = np.array(landmarks)
-            landmarks_array = landmarks_array.reshape(landmarks_array.shape[0], 1, landmarks_array.shape[1])
+            print(f"Initial landmarks shape: {landmarks_array.shape}")
+            
+            # Pad or truncate to get exactly 30 frames
+            if landmarks_array.shape[0] < 30:
+                # Pad with zeros if we have fewer than 30 frames
+                padding = np.zeros((30 - landmarks_array.shape[0], landmarks_array.shape[1]))
+                landmarks_array = np.vstack([landmarks_array, padding])
+            elif landmarks_array.shape[0] > 30:
+                # Truncate if we have more than 30 frames
+                landmarks_array = landmarks_array[:30]
+            
+            print(f"After padding/truncating: {landmarks_array.shape}")
+            
+            # Reshape to match model's expected input shape (None, 30, 126)
+            # We need to duplicate the landmarks to get 126 features
+            landmarks_array = np.tile(landmarks_array, (1, 2))
+            print(f"After tiling: {landmarks_array.shape}")
+            
+            # Add batch dimension
+            landmarks_array = landmarks_array.reshape(1, 30, 126)
+            print(f"Final shape: {landmarks_array.shape}")
             
             # Make prediction
             prediction = self.model.predict(landmarks_array)
+            print(f"Raw prediction probabilities: {prediction}")
+            
+            # Get the predicted class
             predicted_class = np.argmax(prediction, axis=1)
+            print(f"Predicted class index: {predicted_class}")
             
-            # Get the most common prediction
-            from collections import Counter
-            most_common = Counter(predicted_class).most_common(1)
-            final_prediction = most_common[0][0] if most_common else None
+            # Get all class probabilities
+            class_probabilities = prediction[0]
+            print("Class probabilities:")
+            for i, prob in enumerate(class_probabilities):
+                word = self.label_encoder.inverse_transform([i])[0]
+                print(f"  {word}: {prob:.4f}")
             
-            if final_prediction is None:
-                return None
-                
             # Convert prediction index to word
-            return self.label_encoder.inverse_transform([final_prediction])[0]
+            predicted_word = self.label_encoder.inverse_transform(predicted_class)[0]
+            print(f"Final predicted word: {predicted_word}")
+            
+            return predicted_word
             
         except Exception as e:
             print(f"Error in predict_word: {str(e)}")

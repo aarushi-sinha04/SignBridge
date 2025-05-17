@@ -2,14 +2,7 @@ import React from 'react';
 import { useProgress } from '../context/ProgressContext';
 
 const Progress = () => {
-  const { loading } = useProgress(); // Removed unused `progress`
-
-  // Hardcoded values
-  const level = 1;
-  const score = 20;
-  const nextLevelThreshold = 100;
-  const pointsRemaining = nextLevelThreshold - score;
-  const streak = 2;
+  const { progress, loading } = useProgress();
 
   if (loading) {
     return (
@@ -23,6 +16,13 @@ const Progress = () => {
       </div>
     );
   }
+
+  // Calculate values from progress data
+  const level = progress?.level || 1;
+  const score = progress?.score || 0;
+  const nextLevelThreshold = 30; // Points needed to unlock level 2
+  const pointsRemaining = Math.max(0, nextLevelThreshold - score);
+  const streak = progress?.streak || 0;
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-black via-gray-900 to-black py-12 px-4 sm:px-6 lg:px-8">
@@ -47,7 +47,7 @@ const Progress = () => {
 
           <div className="glass-card">
             <h2 className="text-2xl font-bold mb-4">Streak</h2>
-            <div className="text-4xl font-bold text-neon-primary mb-2">{streak} days </div>
+            <div className="text-4xl font-bold text-neon-primary mb-2">{streak} days</div>
             <p className="text-white/80">Consistency is key!</p>
           </div>
         </div>
@@ -55,7 +55,15 @@ const Progress = () => {
         <div className="glass-card">
           <h2 className="text-2xl font-bold mb-6">Completed Lessons</h2>
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-            <p className="text-white/60 col-span-full">No lessons completed yet. Start learning!</p>
+            {progress?.completedLessons?.length > 0 ? (
+              progress.completedLessons.map((lesson, index) => (
+                <div key={index} className="bg-gray-800 p-4 rounded-lg">
+                  <p className="text-white/80">{lesson}</p>
+                </div>
+              ))
+            ) : (
+              <p className="text-white/60 col-span-full">No lessons completed yet. Start learning!</p>
+            )}
           </div>
         </div>
       </div>

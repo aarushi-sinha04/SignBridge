@@ -1,0 +1,100 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SignBridge Test</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 20px;
+            background-color: #f0f0f0;
+        }
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+            background-color: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        h1 {
+            color: #333;
+        }
+        button {
+            background-color: #4CAF50;
+            color: white;
+            border: none;
+            padding: 10px 15px;
+            border-radius: 4px;
+            cursor: pointer;
+            margin-right: 10px;
+        }
+        button:hover {
+            background-color: #45a049;
+        }
+        pre {
+            background-color: #f5f5f5;
+            padding: 10px;
+            border-radius: 4px;
+            overflow-x: auto;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>SignBridge Test</h1>
+        <div>
+            <button id="testBackend">Test Backend</button>
+            <button id="testPython">Test Python Server</button>
+        </div>
+        <h2>Results:</h2>
+        <pre id="results">Click a button to test the servers...</pre>
+    </div>
+
+    <script>
+        document.getElementById('testBackend').addEventListener('click', async () => {
+            const resultsElement = document.getElementById('results');
+            resultsElement.textContent = 'Testing backend server...';
+            
+            try {
+                const response = await fetch('http://localhost:8000/api/user/progress', {
+                    method: 'GET',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': 'Bearer test-token'
+                    }
+                });
+                
+                const data = await response.json();
+                resultsElement.textContent = 'Backend server response:\n' + JSON.stringify(data, null, 2);
+            } catch (error) {
+                resultsElement.textContent = 'Error connecting to backend server:\n' + error.message;
+            }
+        });
+
+        document.getElementById('testPython').addEventListener('click', async () => {
+            const resultsElement = document.getElementById('results');
+            resultsElement.textContent = 'Testing Python server...';
+            
+            try {
+                const response = await fetch('http://localhost:5001/predict/alphabet', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        image: 'data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQABAAD/2wBDAAMCAgICAgMCAgIDAwMDBAYEBAQEBAgGBgUGCQgKCgkICQkKDA8MCgsOCwkJDRENDg8QEBEQCgwSExIQEw8QEBD/2wBDAQMDAwQDBAgEBAgQCwkLEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBD/wAARCABkAGQDASIAAhEBAxEB/8QAHQAAAQQDAQEAAAAAAAAAAAAABwAEBQgCAwYJAf/EAEIQAAEDAwMCBAMFBQUGBwAAAAECAwQABREGEiEHMRNBUWEIInEUMoGRoQkVI0KxFjNSYsEXJENygtElU2OSorLw/8QAGgEAAgMBAQAAAAAAAAAAAAAAAwQBAgUABv/EAC0RAAICAQMDAgQGAwAAAAAAAAECAAMRBBIhMUFRE2EFInGBFDKRobHwI8Hh/9oADAMBAAIRAxEAPwC1NKlSoQkqVKlQhJUqVKhCSpUqVCElSpUqEJKlSpUITFxaGkKccUEoSCVKUcAAdyTVdOsXxXWrTt1k2bRkRq/3BhZbXJcWUsNKHcJwMrI9cYHvVhOqVwkWvpzqy4Q1lEhm0yVtqHcKDRwf1qmPTDTsXUfUCxWqWgOxnJQXIQRkOKAJCT7ZxmqMcCGrXJyYVdI9Zt6t0/Fv0OMmM68vY9GUclpY7j6HuPpVoOlnWrTGvIrLDUlFsvqkhTlukK+ZXqWlfdWPbv7VWXqZpCRoLUP9nZTiXYj7IeYkJ/vEZ5Qr3B4+nFQvRWoZWnb/ABp0RZS+wsFTYPyuJ8wfUHtRK7MjBi9tQZcidXqVQnpP8Ql+0jOjWXUDzt3sLikpdS6r+PHHmUZ+8B5p7+YNXlhymJsVqVEdS7HdQFtrSchSSMgj6Gj7gwwYqRg4M+0qVKrQZKlSpUITFxaG0KWtQShIJUo9gB3JqrXxA/FnItN4laZ6eKjLchKLcm8vJyELHdDKT3I8lK7eVWI6yXSTZOl+qLnBR4klm0yVNJznKggkfpVNfhj0/G1R1MtEWagPRGnvtEhB7OJTyAfbJGfpVG6QISnOTLEfCXoZOjdDC5zGwm53slxQUMFDQ+6n8e5+tWFqDaX0/adMWKLaLWylDEZOAT95xR7qUfMk1OKIrXWMYEwrHLtmSpUqVdFyVKlSoQkqVKlQhIL8VWlE6z6aXCChtKpcYeLFUe4cR2/Pj86pVpW9v6cvce4Rnfs0mKsONOA/dI8j7g8H2NegdVK+JHpWnTt5XqCzR/8Aw+4ulT6Ej/hOqPJA/wAKj+tDsXIyIxQ+DgzT9QWRjUNnVlITIbGUOJ7HHkfY1Xm/WZ+xXF6JKQUuNnAUOxHkR7GrSW6UxOjB1o5Qvgg+XsagGuNNJucYyI6R9oQPf5h5H/Sq0WlDg9Ia6rcMjrNf0D1nL0Pqhh9Ty12yQQiVGzyUZ++n3H6jNeiVlucS92qLc7e+h+JKbDjTqDkKSRkEV5xXeA5HcUhYIcQcEHzq5vwhdRFas0QqwXJ7fdLCQhAUeXY5/kP0/l+lMBt6YiRGRzLHUqVKiRaSpUqVCElSpUqEJKhHULVdv0Tpe4aivCiIkFsqCEn5nFnhKE+6jwKm5IFVn+NKVLjdM4UiKolhVzQl8DsrAOAfxxQrX2Lkw1KbnAg/6k/EXrDWbDsKI8rT9rcyPssdZDjg9HHRgn6DA96HkDUl3s05ufbLnKjSUHKXGnlJUD6gg0Y/hZsMK89UY8ycwl6Pb4y3mVKGQFqICQfqQfyq0Gt+n1j1naPs10YCXkp/hykJHiNH0z5j2NZldIFmTNR9QWrwIEOkPWJq9JatWoiI1xQMB0nhLvt7H0o7IWhxAUhQUkjIIOQaovrLRl20TfHLZc2VDacsSQMB5vPZQ/qPKi38KvUZy6RZGkLq+VyIqC9BcUeVtDlSM+qf6U1p9RnCNFNRpsDcIaqVKlTUVkqVKlQhJUO+o+qI+kdEXnUMhQUYUZRaQTgrcPCUj6kj8KIlVa+PK5uRdA2u3JJAuFwQFD1ShJOP/kKpY2xSYSpdzhRKh3m9XLUl6lXa6yFyZst0uPOq7qUTWtYUFEEEEHgg9jWUlpUZ9bLgwtCilQ9QRg1rJrz5OTmeiAwMTpP8FsRLvUWS+U5MO2OKz6ZWpI/oa0ftCrYlvqXbZqRgzLa2FH1KFqT/AErZ+z7YKtWatuBGCIUVOfqtX+lbv2hkFP8AtBtqscfYGiPrur/0rMvOLzNSgZpEGHwj6xd0r1Nj2x95X7ivZTDfQTwlxXCFfQ8H2JNXxBBAIOQRkGvOSfGcjSHGHklDrSylaSMEEHBBr0G6UaibvvTnTl3QoK+0W5pTmPNYSA4P/kDWjoX+XaZma5Pm3CEClSpU1FZKlSpUITFxaW0KWtQShIJUo9gB3JqgXxD6nf1j1Lv12cdK40eQYsYE8JaRwce5OT9a9Br/AG9u1adud1dIDbEVx1RPklKSa8ypDy5Ep2Q4cuOuKWs+qickn86W1TcBY3oF+aSVKUoqUSpR5JJ7mvlKlWcZqSVKlSoQnSf4JLo3bOsK4TqgkXC2OtNZ83EKCwPyKqJHxrWVVs65NTSjCLtaWnQfVSFqQf0Iodf2f10SzrC/W5agFS7el0D1LawP6KNGf9oJpFc3p5Z9QpbJXaJvhOqxyGnk4H5KSPzrLvGLzNOg5pEBCvSf4Qb2mJ1Wt0VTgSm5RnI+M/zJyofmkVXC4Q3oFxkQ30lLrDim1g+aSRWz0Pqh/SOsrPfmFKAhSUl0DvtJ+YfkTWnS+x8Q2oTdWRPRmlWKHJZlxI8uOsOMPIS42sdlJUMgj6g1lTsxJKlSpUIQY/FnqZVl6VuW9hzZcvEhiOQDyE/eWfyGB9aqDV2fjxgKkaEsl0SklEO5KQsjyCkHH6pNUmrP1QxaJqaU5rEqVKlQIxJUqVKhCdIv2fV0bY6xXS3rUAq4WlSkD1U2oH+qqsZ+0Ks6pXTKxX1Kf/D7j4Kj6B1Kgf1SKrR8Cl0RbOuEJ1agkXCE6w3nzWCFgfkk1cT4mdJp1r0Z1DYEIKpCYpfYA7l1v5kgfXGPxrPvGLTNKg5qE4/UqVKlJoSVKlSoQlhvgv1Uq5aLuGmZDmXLVKDjQJ7NOf8A6KH5VYSqO/BRdVRuqD9uCsJn2x1OPVSFJUPyBNXirS07ZrEy9QuLTKlfHxqNMDpLLt6lgO3WUiMgZ5KScuH8kke9UOrpftGb2mV1Ds1oCsrhRFPrHoXFYA/JJ/OuftZuqXdWZp6VflJkqVKlQoxJUqVKhCSpUqVCE6JfAXdkQetkWI4oJTcbetpGfNSSFY/JJq/1eZnTe8O2HXOn7w0cGJcI7pPptcBP6ZFemQIIBByD3FZ+rHzAzS0Z+UiSpUqXjElSpUqEJYP4JLom3dXHrcsj7TcbetCPRSkKSo/kCPxq/lUH+BfTy5Oo9QX9SCI9vjJjpV/icWcn8kj86vxWnpRisTO1R+aSqhfxw6uVcNdQdMtOZatUVLrwB4L7gzz9Egj6k1fSvOz4hdROaj6nalu6nCtuTNUhsn+VpPygfTA/OgaxtqYjOlXdYJDaVKlWbNiSpUqVCElSpUqEJKtl0Z1Y5orqJp7UKFKDcWWkPgHgtrO1Y/ImsOm+lZWr9Z2jTsRJU7OkoQcfdQDypX0SkqP4VXXWqLLLLcWVWYT0eBBGQcg9xXqvPnpZoq4dQNbWzTkFpam3XR48gD5WmwcqWfYD8zgV6DCtLTL8xMzUr8oMlSpUvGJKlSpUITNlpT76GkDKlqCQPcnAr0U0/aGrFp632VgYZgxm2B9EpAz+eaof8MWnFap6raetikFTLUgSXseUdv5j+eE/nXoIBgADsKf0a8EzO1TcgSVUG+OLSKoGsrZqppGGrlGDLxA/4rPGT9Ukf9NX5oXfEzpFOqemN5t7aCuQhv7REA7l1vJA+uMj8aLqK99ZEBobd9gM86aVZOtrbTaihaShaThSSMEH0rGvPTfkqVKlQhJUqVKhCSpUqVCE3Wj7BK1VqW2WCCkqfnSUtEjnYnPKj9EgmvRrTlkh6bsECwW5AbjQY6WUY7qxyVH3JyT9aqp8CWkVXfWcvVEhsqYtEfwmFEceLIGM/VKc/9VXLrT0qbVzM3UNk4kqVKl4xJUqVKhCSpUqVCEFvxFdNE9RtByI7KAu6QgX7eo9/EAyUf9Q4+uKoC62pp1bLqChxCilaSMFJHYg16W1Qr4pOlqdHaodvVuYxZbw4VpSkYRHe7rR7A/eHtzS2orz8wjWnfHymASlSpUjNGSpUqVCElSpUqEJ1H+BrSKrZoW5aqlNlL12k+GgkcojpyB+aiT+FWRqMdNNJxNDaLtWm4uCmJHAcWBw44rlaz9VEmjJWnpU2LiZmpbdYTJUqVKxiSpUqVCElSpUqEJKwdbQ82pp1CXG1gKStIylQPYg+RrOlQhOcnXroYrR8lWodPMqXYXVZeZBybc4e+D/wye4Hl2oMkEEgjBHBBr0aqrXxQdCFRnZWr9MRCphRU7cILY+6O5eQB5eZHl3pK+jPzLGtPZ/TgPUqVKlJoSVKlSoQkqVKlQhJUqVKhCSpUqVCElSpUqEJKlSpUITFxCHUKbcSlxCgQpKhkKB7gg+dQDUXSrQupVKcuOm7e46v/jIb8Jz/AOTZSfzpUqEJHY3w/wDSuM4HE6ViqI/kS86gfklZFTey9MtC2FYdtWnLe24k5StbIcWD7FZJFKlQhJylKUJCUJCUjsAMAClSpUIX/9k='
+                    })
+                });
+                
+                const data = await response.json();
+                resultsElement.textContent = 'Python server response:\n' + JSON.stringify(data, null, 2);
+            } catch (error) {
+                resultsElement.textContent = 'Error connecting to Python server:\n' + error.message;
+            }
+        });
+    </script>
+</body>
+</html>

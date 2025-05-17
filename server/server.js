@@ -11,7 +11,10 @@ const PORT = process.env.PORT || 8000;
 const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key';
 
 // Middleware
-app.use(cors());
+app.use(cors({
+  origin: ['http://localhost:3000', 'http://localhost:5173'],
+  credentials: true
+}));
 app.use(express.json());
 
 // Proxy middleware for Python ASL server
@@ -52,7 +55,7 @@ const User = mongoose.model('User', userSchema);
 app.post('/api/auth/register', async (req, res) => {
   try {
     const { username, email, password } = req.body;
-    
+
     // Check if user already exists
     const existingUser = await User.findOne({ $or: [{ email }, { username }] });
     if (existingUser) {
@@ -93,39 +96,14 @@ app.post('/api/auth/register', async (req, res) => {
 app.post('/api/auth/login', async (req, res) => {
   try {
     const { username, password } = req.body;
-    console.log('Login attempt for username:', username);
-
-    // Find user
     const user = await User.findOne({ username });
-    console.log('User found:', user ? 'Yes' : 'No');
 
-    if (!user) {
-      console.log('User not found');
+    if (!user || !(await bcrypt.compare(password, user.password))) {
       return res.status(401).json({ message: 'Invalid credentials' });
     }
 
-    // Check password
-    const isPasswordValid = await bcrypt.compare(password, user.password);
-    console.log('Password valid:', isPasswordValid);
-
-    if (!isPasswordValid) {
-      console.log('Invalid password');
-      return res.status(401).json({ message: 'Invalid credentials' });
-    }
-
-    // Generate JWT
     const token = jwt.sign({ userId: user._id }, JWT_SECRET, { expiresIn: '24h' });
-    console.log('Login successful for user:', username);
-
-    res.json({
-      token,
-      user: {
-        id: user._id,
-        username: user.username,
-        email: user.email,
-        progress: user.progress
-      }
-    });
+    res.json({ token, user: { id: user._id, username: user.username, progress: user.progress } });
   } catch (error) {
     console.error('Login error:', error);
     res.status(500).json({ message: 'Error logging in' });
@@ -153,37 +131,116 @@ const authenticateToken = (req, res, next) => {
 // Update progress endpoint
 app.post('/api/user/progress', authenticateToken, async (req, res) => {
   try {
-    const { level, score, completedLesson, achievement } = req.body;
-    const user = await User.findById(req.user.userId);
+    const { score } = req.body;
+    console.log('Progress update request - Adding score:', score);
 
-    if (!user) {
+    // First get the current user to check their progress
+    const currentUser = await User.findById(req.user.userId);
+    if (!currentUser) {
       return res.status(404).json({ message: 'User not found' });
     }
 
-    // Update progress fields if provided
-    if (level) user.progress.level = level;
-    if (score) user.progress.score = score;
-    if (completedLesson) {
-      if (!user.progress.completedLessons.includes(completedLesson)) {
-        user.progress.completedLessons.push(completedLesson);
-      }
-    }
-    if (achievement) {
-      if (!user.progress.achievements.includes(achievement)) {
-        user.progress.achievements.push(achievement);
-      }
-    }
+    console.log('Current user progress:', currentUser.progress);
 
-    user.progress.lastActive = Date.now();
-    await user.save();
+    // Calculate new score by adding to existing score
+    const newScore = (currentUser.progress.score || 0) + (score || 0);
+    console.log('New score will be:', newScore);
 
-    res.json({ 
+    // Update user with new score
+    const updatedUser = await User.findOneAndUpdate(
+      { _id: req.user.userId },
+      {
+        $set: {
+          'progress.score': newScore,
+          'progress.lastActive': Date.now()
+        }
+      },
+      { new: true } // Return the updated document
+    );
+
+    console.log('Updated user progress:', updatedUser.progress);
+
+    res.json({
       message: 'Progress updated successfully',
-      progress: user.progress 
+      progress: updatedUser.progress
     });
   } catch (error) {
     console.error('Error updating progress:', error);
     res.status(500).json({ message: 'Error updating progress' });
+  }
+});
+
+// Separate endpoint to unlock level 2
+app.post('/api/user/unlock-level2', authenticateToken, async (req, res) => {
+  try {
+    const currentUser = await User.findById(req.user.userId);
+    if (!currentUser) {
+      return res.status(404).json({ message: 'User not found' });
+    }
+
+    if (currentUser.progress.score >= 30) {
+      const updatedUser = await User.findOneAndUpdate(
+        { _id: req.user.userId },
+        {
+          $set: {
+            'progress.level': 2,
+            'progress.lastActive': Date.now()
+          }
+        },
+        { new: true }
+      );
+
+      res.json({
+        message: 'Level 2 unlocked successfully',
+        progress: updatedUser.progress
+      });
+    } else {
+      res.status(400).json({
+        message: 'Not enough points to unlock level 2',
+        required: 30,
+        current: currentUser.progress.score
+      });
+    }
+  } catch (error) {
+    console.error('Error unlocking level 2:', error);
+    res.status(500).json({ message: 'Error unlocking level 2' });
+  }
+});
+
+// Separate endpoint to unlock level 3
+app.post('/api/user/unlock-level3', authenticateToken, async (req, res) => {
+  try {
+    const currentUser = await User.findById(req.user.userId);
+    if (!currentUser) {
+      return res.status(404).json({ message: 'User not found' });
+    }
+
+    if (currentUser.progress.score >= 60) {
+      const updatedUser = await User.findOneAndUpdate(
+        { _id: req.user.userId },
+        {
+          $set: {
+            'progress.level': 3,
+            'progress.lastActive': Date.now()
+          }
+        },
+        { new: true }
+      );
+
+      res.json({
+        message: 'Level 3 unlocked successfully',
+        progress: updatedUser.progress
+      });
+    } else {
+      res.status(400).json({
+        message: 'Not enough points to unlock level 3',
+        required: 60,
+        current: currentUser.progress.score
+      });
+    }
+  } catch (error) {
+    console.error('Error unlocking level 3:', error);
+    res.status(500).json({ message: 'Error unlocking level 3' });
   }
 });
 
@@ -194,7 +251,7 @@ app.get('/api/user/progress', authenticateToken, async (req, res) => {
     if (!user) {
       return res.status(404).json({ message: 'User not found' });
     }
-    res.json({ 
+    res.json({
       progress: user.progress,
       user: {
         id: user._id,
@@ -211,4 +268,4 @@ app.get('/api/user/progress', authenticateToken, async (req, res) => {
 // Start server
 app.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`);
-}); 
+});

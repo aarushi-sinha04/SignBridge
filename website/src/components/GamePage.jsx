@@ -1,11 +1,12 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { Button } from './ui/button';
 import { Card } from './ui/card';
 import Webcam from 'react-webcam';
 
 const GamePage = () => {
   const navigate = useNavigate();
+  const location = useLocation();
   const webcamRef = useRef(null);
   const [score, setScore] = useState(0);
   const [currentWord, setCurrentWord] = useState('');
@@ -15,13 +16,17 @@ const GamePage = () => {
   const [capturedFrames, setCapturedFrames] = useState([]);
   const [showWord, setShowWord] = useState(true);
   const [isGameActive, setIsGameActive] = useState(false);
-  const [level, setLevel] = useState(1);
+
+  // Get level from URL query parameters
+  const queryParams = new URLSearchParams(location.search);
+  const levelParam = queryParams.get('level');
+  const [level, setLevel] = useState(levelParam ? parseInt(levelParam) : 1);
 
   // Level-based content lists
   const contentLists = {
     1: ['A', 'B', 'C', 'D', 'E', 'F'],
-    2: ['hello', 'thank you', 'goodbye', 'yes', 'no'],
-    3: ['please', 'sorry', 'help', 'water', 'food'],
+    2: ['busy', 'hello', 'help'], // Only the three words our model can predict
+    3: ['how are you', 'nice to meet you', 'what is your name'], // Only the three sentences our model can predict
     4: ['friend', 'family', 'home', 'school', 'work']
   };
 
@@ -122,7 +127,22 @@ const GamePage = () => {
 
   const checkSign = async () => {
     try {
-      const endpoint = level === 1 ? '/predict/alphabet' : '/predict/word';
+      let endpoint;
+      if (level === 1) {
+        endpoint = '/predict/alphabet';
+      } else if (level === 2) {
+        endpoint = '/predict/word';
+      } else if (level === 3) {
+        endpoint = '/predict/sentence';
+      }
+
+      console.log('Using endpoint:', endpoint);
+      console.log('Level:', level);
+      console.log('Captured frames:', capturedFrames.length);
+
+      console.log('Sending request to:', `http://localhost:5001${endpoint}`);
+      console.log('Request body:', level === 1 ? { image: 'base64 image data...' } : { frames: `${capturedFrames.length} frames` });
+
       const response = await fetch(`http://localhost:5001${endpoint}`, {
         method: 'POST',
         headers: {
@@ -131,6 +151,8 @@ const GamePage = () => {
         body: JSON.stringify(level === 1 ? { image: capturedFrames[0] } : { frames: capturedFrames }),
       });
 
+      console.log('Response status:', response.status);
+
       if (!response.ok) {
         throw new Error('Network response was not ok');
       }
@@ -138,11 +160,12 @@ const GamePage = () => {
       const data = await response.json();
       const prediction = data?.prediction?.toUpperCase();
       const isCorrectPrediction = prediction === currentWord.toUpperCase();
-      
+
       setIsCorrect(isCorrectPrediction);
       if (isCorrectPrediction) {
         setScore((prev) => prev + 10);
         setMessage('Correct! +10 points');
+        await updateScoreInDB();
       } else {
         setMessage(`Incorrect. The sign was for "${currentWord}"`);
       }
@@ -157,12 +180,87 @@ const GamePage = () => {
     }
   };
 
+  const updateScoreInDB = async () => {
+    try {
+      console.log('Updating score in DB');
+      const token = localStorage.getItem('authToken');
+      if (!token) {
+        console.error('No token found');
+        return;
+      }
+
+      // Update score by adding 10 points
+      const updateResponse = await fetch('http://localhost:8000/api/user/progress', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({
+          score: 10 // Points to add for each correct word
+        })
+      });
+
+      if (!updateResponse.ok) {
+        const errorData = await updateResponse.json();
+        console.error('Error updating score:', errorData);
+        throw new Error('Failed to update score');
+      }
+
+      const updatedData = await updateResponse.json();
+      console.log('Score update response:', updatedData);
+
+      // Update local score state with the new score from DB
+      setScore(updatedData.progress.score);
+
+      // Check if we should unlock level 2
+      if (updatedData.progress.score >= 30 && updatedData.progress.level < 2) {
+        // Try to unlock level 2
+        const unlockResponse = await fetch('http://localhost:8000/api/user/unlock-level2', {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${token}`
+          }
+        });
+
+        if (unlockResponse.ok) {
+          setMessage('Congratulations! You have unlocked the Words level!');
+          // Refresh the page to ensure all components update
+          setTimeout(() => {
+            window.location.reload();
+          }, 2000);
+        }
+      }
+
+      // Check if we should unlock level 3
+      if (updatedData.progress.score >= 60 && updatedData.progress.level < 3) {
+        // Try to unlock level 3
+        const unlockResponse = await fetch('http://localhost:8000/api/user/unlock-level3', {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${token}`
+          }
+        });
+
+        if (unlockResponse.ok) {
+          setMessage('Congratulations! You have unlocked the Sentences level!');
+          // Refresh the page to ensure all components update
+          setTimeout(() => {
+            window.location.reload();
+          }, 2000);
+        }
+      }
+    } catch (error) {
+      console.error('Error in updateScoreInDB:', error);
+    }
+  };
+
   return (
     <div className="min-h-screen p-8">
       <div className="max-w-6xl mx-auto">
         <div className="text-center mb-8">
           <h1 className="text-4xl font-bold text-whitemb-4">Sign Language Game</h1>
-          <p className="text-xl text-white/80">Level {level} - {level === 1 ? 'Alphabets' : 'Words'}</p>
+          <p className="text-xl text-white/80">Level {level} - {level === 1 ? 'Alphabets' : level === 2 ? 'Words' : 'Sentences'}</p>
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
@@ -181,7 +279,7 @@ const GamePage = () => {
                 </div>
               )}
             </div>
-            
+
             {!isGameActive ? (
               <Button onClick={startGame} className="w-full">
                 Start Game
@@ -233,8 +331,8 @@ const GamePage = () => {
                   <ul className="space-y-2 text-gray-600 text-left">
                     <li>• Click "Start Game" to begin</li>
                     <li>• Position yourself in front of the camera</li>
-                    <li>• When you see {level === 1 ? 'an alphabet' : 'a word'}, click "Start Recording"</li>
-                    <li>• Show the sign for {level === 1 ? 'the alphabet' : 'the word'}</li>
+                    <li>• When you see {level === 1 ? 'an alphabet' : level === 2 ? 'a word' : 'a sentence'}, click "Start Recording"</li>
+                    <li>• Show the sign for {level === 1 ? 'the alphabet' : level === 2 ? 'the word' : 'the sentence'}</li>
                     <li>• Click "Stop Recording" when done</li>
                     <li>• Earn 10 points for each correct sign</li>
                   </ul>
@@ -248,4 +346,4 @@ const GamePage = () => {
   );
 };
 
-export default GamePage; 
+export default GamePage;

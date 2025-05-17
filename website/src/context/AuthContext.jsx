@@ -28,7 +28,7 @@ export const AuthProvider = ({ children }) => {
           'Authorization': `Bearer ${token}`
         }
       });
-      
+
       if (response.ok) {
         const data = await response.json();
         setUser(data.user);
@@ -104,7 +104,7 @@ export const AuthProvider = ({ children }) => {
 
   return (
     <AuthContext.Provider value={{ user, loading, login, signup, logout }}>
-      {!loading && children}
+      {children}
     </AuthContext.Provider>
   );
 };
@@ -120,4 +120,4 @@ export const useAuth = () => {
 export const getVideoPath = async (word) => {
   const fileName = `${word}.mp4`;
   return `/assets/${fileName}`;
-}; 
+};

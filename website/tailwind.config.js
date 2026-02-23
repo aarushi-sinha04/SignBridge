@@ -19,6 +19,9 @@ export default {
         'border': 'rgba(255, 255, 255, 0.1)',
         'success': '#4ecca3',
         'danger': '#ff6b6b',
+        'neon-primary': 'var(--neon-primary)',
+        'neon-secondary': 'var(--neon-secondary)',
+        'neon-accent': 'var(--neon-accent)',
       },
       fontFamily: {
         'inter': ['Inter', 'sans-serif'],

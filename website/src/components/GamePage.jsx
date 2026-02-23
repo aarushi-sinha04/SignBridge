@@ -27,7 +27,7 @@ const GamePage = () => {
 
   // Level-based content lists
   const contentLists = {
-    1: ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M', 'N', 'O', 'P', 'Q', 'R', 'S', 'T', 'U', 'V', 'W', 'X', 'Y', 'Z'],
+    1: ['A', 'B', 'C', 'D', 'E', 'F'],
     2: ['busy', 'hello', 'help'], // Words our model can predict
     3: ['how are you', 'nice to meet you', 'what is your name'], // Sentences
     4: ['friend', 'family', 'home', 'school', 'work']
@@ -148,7 +148,7 @@ const GamePage = () => {
         setIsCorrect(true);
         setScore((prev) => prev + 10);
         setMessage('Correct! +10 points. Getting next sign...');
-        await updateScoreInDB();
+        await updateScoreInDB(currentWord.toUpperCase());
 
         // Advance automatically
         setTimeout(() => getNewWord(), 2000);
@@ -161,10 +161,13 @@ const GamePage = () => {
     }
   };
 
-  const updateScoreInDB = async () => {
+  const updateScoreInDB = async (completedLesson = null) => {
     try {
       const token = localStorage.getItem('authToken');
       if (!token) return;
+
+      const payload = { score: 10 };
+      if (completedLesson) payload.completedLesson = completedLesson;
 
       const updateResponse = await fetch('http://localhost:8000/api/user/progress', {
         method: 'POST',
@@ -172,7 +175,7 @@ const GamePage = () => {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${token}`
         },
-        body: JSON.stringify({ score: 10 })
+        body: JSON.stringify(payload)
       });
 
       if (!updateResponse.ok) return;

@@ -24,9 +24,7 @@ const Practice = () => {
     1: {
       title: 'Alphabets',
       items: [
-        'A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J',
-        'K', 'L', 'M', 'N', 'O', 'P', 'Q', 'R', 'S', 'T',
-        'U', 'V', 'W', 'X', 'Y', 'Z'
+        'A', 'B', 'C', 'D', 'E', 'F'
       ],
       descriptions: {
         'A': 'Make a fist with your thumb sticking out',
@@ -193,6 +191,11 @@ const Practice = () => {
     }
   };
 
+  const getVideoSrcPath = (item) => {
+    if (!item) return '';
+    return item.split(' ').map(word => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase()).join(' ');
+  };
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-black via-gray-900 to-black py-12 px-4 sm:px-6 lg:px-8">
       <div className="max-w-7xl mx-auto mt-16">
@@ -217,7 +220,7 @@ const Practice = () => {
                 onClick={() => handleItemClick(item)}
                 className={`p-3 rounded-lg text-xl font-bold transition-all duration-300 ${selectedItem === item
                   ? 'bg-neon-primary text-black transform scale-110 shadow-[0_0_15px_#00f3ff]'
-                  : 'bg-gray-800/80 text-gray-300 hover:bg-gray-700 hover:text-white hover:border-neon-primary/50 border border-transparent'
+                  : 'bg-gray-800/80 text-white hover:bg-gray-600 hover:text-white hover:border-neon-primary/50 border border-transparent'
                   }`}
               >
                 {item}
@@ -228,18 +231,19 @@ const Practice = () => {
           {selectedItem && (
             <div className="text-center bg-black/40 p-8 rounded-xl border border-white/10 relative overflow-hidden">
               <h2 className="text-3xl font-semibold text-white mb-6">
-                Practice: <span className="text-neon-primary uppercase tracking-wider text-4xl">{selectedItem}</span>
+                Practice: <span className="text-neon-primary uppercase tracking-wider text-4xl">{selectedItem || "?"}</span>
               </h2>
 
               {!showWebcam ? (
                 <div className="space-y-6">
                   <div className="bg-gray-900/80 rounded-xl p-4 max-w-lg mx-auto border border-white/10 shadow-lg">
-                    {/* Placeholder for video file. Usually you'd load /assets/item.mp4 */}
+                    {/* Key forces video element to remount on src change */}
                     <video
+                      key={selectedItem}
                       className="w-full rounded-lg"
                       controls autoPlay loop muted playsInline
                     >
-                      <source src={`/assets/${selectedItem}.mp4`} type="video/mp4" />
+                      <source src={`/assets/${getVideoSrcPath(selectedItem)}.mp4`} type="video/mp4" />
                       Video not found for this sign.
                     </video>
                   </div>

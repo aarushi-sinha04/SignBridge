@@ -19,11 +19,11 @@ app.use(express.json());
 
 // Proxy middleware for Python ASL server
 app.use('/api/asl', createProxyMiddleware({
-    target: 'http://localhost:5000',
-    changeOrigin: true,
-    pathRewrite: {
-        '^/api/asl': '/'
-    }
+  target: 'http://localhost:5000',
+  changeOrigin: true,
+  pathRewrite: {
+    '^/api/asl': '/'
+  }
 }));
 
 // Connect to MongoDB
@@ -31,8 +31,8 @@ mongoose.connect(process.env.MONGODB_URI || 'mongodb://localhost:27017/signbridg
   useNewUrlParser: true,
   useUnifiedTopology: true,
 })
-.then(() => console.log('Connected to MongoDB'))
-.catch(err => console.error('MongoDB connection error:', err));
+  .then(() => console.log('Connected to MongoDB'))
+  .catch(err => console.error('MongoDB connection error:', err));
 
 // User Schema
 const userSchema = new mongoose.Schema({
@@ -45,6 +45,7 @@ const userSchema = new mongoose.Schema({
     completedLessons: [{ type: String }],
     currentLesson: { type: String, default: '' },
     achievements: [{ type: String }],
+    streak: { type: Number, default: 0 },
     lastActive: { type: Date, default: Date.now }
   }
 });
@@ -131,8 +132,8 @@ const authenticateToken = (req, res, next) => {
 // Update progress endpoint
 app.post('/api/user/progress', authenticateToken, async (req, res) => {
   try {
-    const { score } = req.body;
-    console.log('Progress update request - Adding score:', score);
+    const { score, completedLesson } = req.body;
+    console.log('Progress update request - Adding score:', score, 'Completed lesson:', completedLesson);
 
     // First get the current user to check their progress
     const currentUser = await User.findById(req.user.userId);
@@ -146,15 +147,44 @@ app.post('/api/user/progress', authenticateToken, async (req, res) => {
     const newScore = (currentUser.progress.score || 0) + (score || 0);
     console.log('New score will be:', newScore);
 
+    // Streak Logic
+    const now = new Date();
+    const lastActive = new Date(currentUser.progress.lastActive || now);
+
+    // Check if lastActive was yesterday
+    const yesterday = new Date(now);
+    yesterday.setDate(now.getDate() - 1);
+
+    let newStreak = currentUser.progress.streak || 0;
+
+    if (lastActive.toDateString() === yesterday.toDateString()) {
+      newStreak += 1;
+    } else if (lastActive.toDateString() !== now.toDateString()) {
+      newStreak = 1; // Stream broken or first time playing
+    } else if (newStreak === 0) {
+      newStreak = 1; // Play first time on same day
+    }
+
+    // Construct update query
+    const updateQuery = {
+      $set: {
+        'progress.score': newScore,
+        'progress.streak': newStreak,
+        'progress.lastActive': Date.now()
+      }
+    };
+
+    // Add lesson to array if provided
+    if (completedLesson) {
+      updateQuery.$addToSet = {
+        'progress.completedLessons': completedLesson
+      };
+    }
+
     // Update user with new score
     const updatedUser = await User.findOneAndUpdate(
       { _id: req.user.userId },
-      {
-        $set: {
-          'progress.score': newScore,
-          'progress.lastActive': Date.now()
-        }
-      },
+      updateQuery,
       { new: true } // Return the updated document
     );
 
@@ -241,6 +271,32 @@ app.post('/api/user/unlock-level3', authenticateToken, async (req, res) => {
   } catch (error) {
     console.error('Error unlocking level 3:', error);
     res.status(500).json({ message: 'Error unlocking level 3' });
+  }
+});
+
+// Reset detailed progress endpoint
+app.post('/api/user/reset-progress', authenticateToken, async (req, res) => {
+  try {
+    const updatedUser = await User.findOneAndUpdate(
+      { _id: req.user.userId },
+      {
+        $set: {
+          'progress.level': 1,
+          'progress.score': 0,
+          'progress.streak': 0,
+          'progress.completedLessons': [],
+          'progress.lastActive': Date.now()
+        }
+      },
+      { new: true }
+    );
+    res.json({
+      message: 'Progress reset successfully',
+      progress: updatedUser.progress
+    });
+  } catch (error) {
+    console.error('Error resetting progress:', error);
+    res.status(500).json({ message: 'Error resetting progress' });
   }
 });
 

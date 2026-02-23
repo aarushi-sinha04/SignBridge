@@ -17,7 +17,7 @@ const HomePage = () => {
         <div className="grid grid-cols-1 md:grid-cols-2 gap-8 max-w-3xl mx-auto">
           <div className="glass-card hover:-translate-y-2 transition-transform duration-500 flex flex-col h-full border-neon-secondary/20">
             <h2 className="text-3xl font-bold text-white mb-4 flex items-center">
-              <span className="text-neon-secondary mr-3">📚</span> Learn
+              Learn
             </h2>
             <p className="text-gray-400 mb-8 text-lg flex-grow">
               Start your journey by learning individual alphabets, essential words, and complex sentences.

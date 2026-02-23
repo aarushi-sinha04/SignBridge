@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { Button } from './ui/button';
 import { Card } from './ui/card';
@@ -8,14 +8,17 @@ const GamePage = () => {
   const navigate = useNavigate();
   const location = useLocation();
   const webcamRef = useRef(null);
+
   const [score, setScore] = useState(0);
   const [currentWord, setCurrentWord] = useState('');
-  const [isRecording, setIsRecording] = useState(false);
   const [message, setMessage] = useState('');
   const [isCorrect, setIsCorrect] = useState(null);
-  const [capturedFrames, setCapturedFrames] = useState([]);
-  const [showWord, setShowWord] = useState(true);
   const [isGameActive, setIsGameActive] = useState(false);
+  const [isTransitioning, setIsTransitioning] = useState(false);
+
+  // Use refs to hold mutable variables across interval callbacks without stale state issues
+  const framesBufferRef = useRef([]);
+  const isTransitioningRef = useRef(false);
 
   // Get level from URL query parameters
   const queryParams = new URLSearchParams(location.search);
@@ -24,21 +27,11 @@ const GamePage = () => {
 
   // Level-based content lists
   const contentLists = {
-    1: ['A', 'B', 'C', 'D', 'E', 'F'],
-    2: ['busy', 'hello', 'help'], // Only the three words our model can predict
-    3: ['how are you', 'nice to meet you', 'what is your name'], // Only the three sentences our model can predict
+    1: ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M', 'N', 'O', 'P', 'Q', 'R', 'S', 'T', 'U', 'V', 'W', 'X', 'Y', 'Z'],
+    2: ['busy', 'hello', 'help'], // Words our model can predict
+    3: ['how are you', 'nice to meet you', 'what is your name'], // Sentences
     4: ['friend', 'family', 'home', 'school', 'work']
   };
-
-  useEffect(() => {
-    let frameInterval;
-    if (isRecording) {
-      frameInterval = setInterval(captureFrame, 100);
-    }
-    return () => {
-      if (frameInterval) clearInterval(frameInterval);
-    };
-  }, [isRecording]);
 
   const startCamera = async () => {
     try {
@@ -48,19 +41,20 @@ const GamePage = () => {
       }
     } catch (err) {
       console.error('Error accessing camera:', err);
-      setMessage('Error accessing camera. Please make sure you have granted camera permissions.');
+      setMessage('Error accessing camera. Please grant camera permissions.');
     }
   };
 
-  const stopCamera = () => {
-    if (webcamRef.current) {
-      const stream = webcamRef.current.video.srcObject;
-      if (stream) {
-        const tracks = stream.getTracks();
-        tracks.forEach(track => track.stop());
-      }
-    }
-  };
+  const getNewWord = useCallback(() => {
+    const content = contentLists[level];
+    const randomIndex = Math.floor(Math.random() * content.length);
+    setCurrentWord(content[randomIndex]);
+    setMessage('Show this sign to the camera!');
+    setIsCorrect(null);
+    framesBufferRef.current = [];
+    isTransitioningRef.current = false;
+    setIsTransitioning(false);
+  }, [level]);
 
   const startGame = () => {
     setIsGameActive(true);
@@ -69,241 +63,190 @@ const GamePage = () => {
     startCamera();
   };
 
-  const getNewWord = () => {
-    const content = contentLists[level];
-    const randomIndex = Math.floor(Math.random() * content.length);
-    setCurrentWord(content[randomIndex]);
-    setShowWord(true);
-    setIsRecording(false);
-    setCapturedFrames([]);
+  const stopCamera = () => {
+    if (webcamRef.current && webcamRef.current.video) {
+      const stream = webcamRef.current.video.srcObject;
+      if (stream) {
+        const tracks = stream.getTracks();
+        tracks.forEach(track => track.stop());
+      }
+    }
+  };
+
+  const stopGame = () => {
+    setIsGameActive(false);
+    stopCamera();
     setMessage('');
     setIsCorrect(null);
-  };
-
-  const startRecording = () => {
-    setShowWord(false);
-    setIsRecording(true);
-    setCapturedFrames([]);
-    setMessage(`Recording... Show the sign for: ${currentWord}`);
-  };
-
-  const stopRecording = async () => {
-    setIsRecording(false);
-    if (level === 1) {
-      // For alphabet, we only need one frame
-      if (capturedFrames.length > 0) {
-        await checkSign();
-      } else {
-        setMessage('No frame captured. Please try again.');
-      }
-    } else {
-      // For words, we need multiple frames
-      if (capturedFrames.length >= 30) {
-        await checkSign();
-      } else {
-        setMessage(`Need ${30 - capturedFrames.length} more frames. Please try again.`);
-      }
-    }
-  };
-
-  const captureFrame = () => {
-    if (webcamRef.current && isRecording) {
-      const imageSrc = webcamRef.current.getScreenshot();
-      if (imageSrc) {
-        if (level === 1) {
-          // For alphabet, only keep the latest frame
-          setCapturedFrames([imageSrc]);
-        } else {
-          // For words, keep accumulating frames
-          setCapturedFrames((prev) => [...prev, imageSrc]);
-        }
-      }
-    }
   };
 
   const skipWord = () => {
     getNewWord();
   };
 
-  const checkSign = async () => {
+  // Continuous capture and prediction loops
+  useEffect(() => {
+    let captureInterval;
+    let predictInterval;
+
+    if (isGameActive) {
+      // 1. Capture loop: grabs frames quickly
+      captureInterval = setInterval(() => {
+        if (!isTransitioningRef.current && webcamRef.current) {
+          const imageSrc = webcamRef.current.getScreenshot();
+          if (imageSrc) {
+            framesBufferRef.current.push(imageSrc);
+
+            // Maintain rolling buffer based on level
+            const limit = level === 1 ? 1 : (level === 2 ? 30 : 60);
+            if (framesBufferRef.current.length > limit) {
+              framesBufferRef.current.shift(); // Remove oldest frame
+            }
+          }
+        }
+      }, 100);
+
+      // 2. Predict loop: sends buffered frames to backend
+      predictInterval = setInterval(async () => {
+        const required = level === 1 ? 1 : (level === 2 ? 30 : 60);
+
+        if (!isTransitioningRef.current && framesBufferRef.current.length >= required) {
+          await checkSign(framesBufferRef.current);
+        }
+      }, 1000); // Poll backend every 1 second
+    }
+
+    return () => {
+      if (captureInterval) clearInterval(captureInterval);
+      if (predictInterval) clearInterval(predictInterval);
+    };
+  }, [isGameActive, level, currentWord]);
+
+  const checkSign = async (framesToPredict) => {
     try {
-      let endpoint;
-      if (level === 1) {
-        endpoint = '/predict/alphabet';
-      } else if (level === 2) {
-        endpoint = '/predict/word';
-      } else if (level === 3) {
-        endpoint = '/predict/sentence';
-      }
+      let endpoint = level === 1 ? '/predict/alphabet' : (level === 2 ? '/predict/word' : '/predict/sentence');
 
-      console.log('Using endpoint:', endpoint);
-      console.log('Level:', level);
-      console.log('Captured frames:', capturedFrames.length);
-
-      console.log('Sending request to:', `http://localhost:5001${endpoint}`);
-      console.log('Request body:', level === 1 ? { image: 'base64 image data...' } : { frames: `${capturedFrames.length} frames` });
+      const bodyData = level === 1
+        ? { image: framesToPredict[0] }
+        : { frames: framesToPredict };
 
       const response = await fetch(`http://localhost:5001${endpoint}`, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(level === 1 ? { image: capturedFrames[0] } : { frames: capturedFrames }),
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(bodyData),
       });
 
-      console.log('Response status:', response.status);
-
-      if (!response.ok) {
-        throw new Error('Network response was not ok');
-      }
+      if (!response.ok) return;
 
       const data = await response.json();
       const prediction = data?.prediction?.toUpperCase();
-      const isCorrectPrediction = prediction === currentWord.toUpperCase();
 
-      setIsCorrect(isCorrectPrediction);
-      if (isCorrectPrediction) {
+      if (prediction === currentWord.toUpperCase()) {
+        // MATCH FOUND
+        isTransitioningRef.current = true;
+        setIsTransitioning(true);
+        setIsCorrect(true);
         setScore((prev) => prev + 10);
-        setMessage('Correct! +10 points');
+        setMessage('Correct! +10 points. Getting next sign...');
         await updateScoreInDB();
-      } else {
-        setMessage(`Incorrect. The sign was for "${currentWord}"`);
-      }
 
-      // Move to next word after a delay
-      setTimeout(() => {
-        getNewWord();
-      }, 2000);
+        // Advance automatically
+        setTimeout(() => getNewWord(), 2000);
+      } else if (prediction && prediction !== 'NO PREDICTION' && prediction !== 'UNRECOGNIZED') {
+        // Only update UI if we have a real but incorrect prediction
+        setMessage(`Detected: "${prediction}". Try again!`);
+      }
     } catch (error) {
-      console.error('Error checking sign:', error);
-      setMessage('Error checking sign. Please try again.');
+      console.error('Prediction query error:', error);
     }
   };
 
   const updateScoreInDB = async () => {
     try {
-      console.log('Updating score in DB');
       const token = localStorage.getItem('authToken');
-      if (!token) {
-        console.error('No token found');
-        return;
-      }
+      if (!token) return;
 
-      // Update score by adding 10 points
       const updateResponse = await fetch('http://localhost:8000/api/user/progress', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${token}`
         },
-        body: JSON.stringify({
-          score: 10 // Points to add for each correct word
-        })
+        body: JSON.stringify({ score: 10 })
       });
 
-      if (!updateResponse.ok) {
-        const errorData = await updateResponse.json();
-        console.error('Error updating score:', errorData);
-        throw new Error('Failed to update score');
-      }
+      if (!updateResponse.ok) return;
 
       const updatedData = await updateResponse.json();
-      console.log('Score update response:', updatedData);
-
-      // Update local score state with the new score from DB
       setScore(updatedData.progress.score);
 
-      // Check if we should unlock level 2
+      // Level up checks
       if (updatedData.progress.score >= 30 && updatedData.progress.level < 2) {
-        // Try to unlock level 2
-        const unlockResponse = await fetch('http://localhost:8000/api/user/unlock-level2', {
-          method: 'POST',
-          headers: {
-            'Authorization': `Bearer ${token}`
-          }
+        await fetch('http://localhost:8000/api/user/unlock-level2', {
+          method: 'POST', headers: { 'Authorization': `Bearer ${token}` }
         });
-
-        if (unlockResponse.ok) {
-          setMessage('Congratulations! You have unlocked the Words level!');
-          // Refresh the page to ensure all components update
-          setTimeout(() => {
-            window.location.reload();
-          }, 2000);
-        }
       }
 
-      // Check if we should unlock level 3
       if (updatedData.progress.score >= 60 && updatedData.progress.level < 3) {
-        // Try to unlock level 3
-        const unlockResponse = await fetch('http://localhost:8000/api/user/unlock-level3', {
-          method: 'POST',
-          headers: {
-            'Authorization': `Bearer ${token}`
-          }
+        await fetch('http://localhost:8000/api/user/unlock-level3', {
+          method: 'POST', headers: { 'Authorization': `Bearer ${token}` }
         });
-
-        if (unlockResponse.ok) {
-          setMessage('Congratulations! You have unlocked the Sentences level!');
-          // Refresh the page to ensure all components update
-          setTimeout(() => {
-            window.location.reload();
-          }, 2000);
-        }
       }
     } catch (error) {
-      console.error('Error in updateScoreInDB:', error);
+      console.error('Error updating score:', error);
     }
   };
 
   return (
-    <div className="min-h-screen p-8">
-      <div className="max-w-6xl mx-auto">
+    <div className="min-h-screen p-8 bg-gradient-to-br from-black via-gray-900 to-black">
+      <div className="max-w-6xl mx-auto mt-20">
         <div className="text-center mb-8">
-          <h1 className="text-4xl font-bold text-whitemb-4">Sign Language Game</h1>
-          <p className="text-xl text-white/80">Level {level} - {level === 1 ? 'Alphabets' : level === 2 ? 'Words' : 'Sentences'}</p>
+          <h1 className="text-4xl font-bold text-white mb-2 tracking-wide neon-text">Sign to Speech Challenge</h1>
+          <p className="text-xl text-white/80">Level {level} - {level === 1 ? 'Alphabets' : (level === 2 ? 'Words' : 'Sentences')}</p>
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
           {/* Camera Box */}
-          <Card className="p-6">
-            <div className="aspect-video mb-4">
+          <Card className="p-6 bg-black/40 border border-white/10 backdrop-blur-md rounded-xl overflow-hidden shadow-2xl relative">
+            <div className={`aspect-video mb-6 relative rounded-lg overflow-hidden border-2 ${isCorrect ? 'border-green-500' : 'border-white/20'}`}>
               {isGameActive ? (
-                <Webcam
-                  ref={webcamRef}
-                  screenshotFormat="image/jpeg"
-                  className="w-full h-full object-cover rounded-lg"
-                />
+                <>
+                  <Webcam
+                    ref={webcamRef}
+                    screenshotFormat="image/jpeg"
+                    className="w-full h-full object-cover"
+                    mirrored={true}
+                  />
+                  {/* Scanning overlay effect */}
+                  {!isTransitioning && (
+                    <div className="absolute top-0 left-0 w-full h-1 bg-neon-primary/50 opacity-50 shadow-[0_0_15px_#00f3ff] animate-scan" style={{ top: '50%' }}></div>
+                  )}
+                </>
               ) : (
-                <div className="w-full h-full bg-gray-200 rounded-lg flex items-center justify-center">
-                  <p className="text-gray-500">Camera will start when game begins</p>
+                <div className="w-full h-full bg-gray-800/80 flex flex-col items-center justify-center text-center p-4">
+                  <span className="text-5xl mb-4">📷</span>
+                  <p className="text-gray-400 font-medium">Camera will start when game begins</p>
                 </div>
               )}
             </div>
 
             {!isGameActive ? (
-              <Button onClick={startGame} className="w-full">
-                Start Game
+              <Button onClick={startGame} className="w-full btn-primary text-lg py-6">
+                START PLAYING
               </Button>
             ) : (
               <div className="space-y-4">
-                <div className="flex gap-4">
-                  {!isRecording ? (
-                    <Button onClick={startRecording} className="flex-1">
-                      Start Recording
-                    </Button>
-                  ) : (
-                    <Button onClick={stopRecording} className="flex-1">
-                      Stop Recording
-                    </Button>
-                  )}
-                </div>
                 {message && (
-                  <div className={`text-center p-4 rounded-lg ${
-                    isCorrect === true ? 'bg-green-100 text-green-800' :
-                    isCorrect === false ? 'bg-red-100 text-red-800' :
-                    'bg-yellow-100 text-yellow-800'
-                  }`}>
+                  <div className={`text-center p-4 rounded-lg font-bold text-lg animate-pulse ${isCorrect === true ? 'bg-green-500/20 text-green-400 border border-green-500/50' :
+                    'bg-neon-primary/10 text-neon-primary border border-neon-primary/30'
+                    }`}>
                     {message}
+                  </div>
+                )}
+                {!isTransitioning && (
+                  <div className="flex items-center justify-center space-x-2 text-white/60 text-sm mt-2">
+                    <div className="w-2 h-2 rounded-full bg-neon-primary animate-ping"></div>
+                    <span>Auto-detecting signs...</span>
                   </div>
                 )}
               </div>
@@ -311,31 +254,40 @@ const GamePage = () => {
           </Card>
 
           {/* Word Box */}
-          <Card className="p-6">
-            <div className="space-y-6">
-              <div className="flex justify-between items-center">
-                <div className="text-2xl font-bold">Score: {score}</div>
-                {isGameActive && (
-                  <Button onClick={skipWord} variant="outline">Skip Word</Button>
+          <Card className="p-8 bg-black/40 border border-white/10 backdrop-blur-md rounded-xl shadow-2xl flex flex-col justify-between">
+            <div className="space-y-8">
+              <div className="flex justify-between items-center bg-gray-800/50 p-4 rounded-lg border border-white/5">
+                <div className="text-2xl font-bold text-white flex items-center">
+                  <span className="text-yellow-400 mr-2">★</span> Score: <span className="text-neon-primary ml-2">{score}</span>
+                </div>
+                {isGameActive && !isTransitioning && (
+                  <div className="flex space-x-2">
+                    <Button onClick={skipWord} variant="outline" className="border-white/20 hover:bg-white/10 text-white font-medium bg-transparent shadow-none">
+                      Skip Sign ⏭
+                    </Button>
+                    <Button onClick={stopGame} variant="destructive" className="bg-red-500/20 hover:bg-red-500/40 text-red-500 border border-red-500/50 font-medium">
+                      Stop ⏹
+                    </Button>
+                  </div>
                 )}
               </div>
 
               {isGameActive ? (
-                <div className="text-center space-y-4">
-                  <h2 className="text-2xl font-bold">Show this sign:</h2>
-                  <div className="text-6xl font-bold text-blue-600">{currentWord}</div>
+                <div className="text-center space-y-8 py-8">
+                  <h2 className="text-3xl font-semibold text-white/80">Replicate this:</h2>
+                  <div className="text-7xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-neon-primary to-neon-secondary tracking-widest uppercase py-4">
+                    {currentWord}
+                  </div>
                 </div>
               ) : (
-                <div className="text-center space-y-4">
-                  <h2 className="text-2xl font-bold">Instructions</h2>
-                  <ul className="space-y-2 text-gray-600 text-left">
-                    <li>• Click "Start Game" to begin</li>
-                    <li>• Position yourself in front of the camera</li>
-                    <li>• When you see {level === 1 ? 'an alphabet' : level === 2 ? 'a word' : 'a sentence'}, click "Start Recording"</li>
-                    <li>• Show the sign for {level === 1 ? 'the alphabet' : level === 2 ? 'the word' : 'the sentence'}</li>
-                    <li>• Click "Stop Recording" when done</li>
-                    <li>• Earn 10 points for each correct sign</li>
-                  </ul>
+                <div className="text-center space-y-6 flex-grow flex flex-col justify-center">
+                  <h2 className="text-3xl font-bold text-white">Instructions</h2>
+                  <div className="space-y-4 text-white/70 text-left bg-gray-800/50 p-6 rounded-lg font-medium text-lg leading-relaxed">
+                    <p>✨ Click "Start Playing" to activate your camera.</p>
+                    <p>🤖 An AI model will continuously watch your hands.</p>
+                    <p>🙌 Perform the exact sign requested on the screen.</p>
+                    <p>🏆 Earn points automatically as soon as the sign is recognized!</p>
+                  </div>
                 </div>
               )}
             </div>

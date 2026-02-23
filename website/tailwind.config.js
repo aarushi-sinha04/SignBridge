@@ -31,6 +31,7 @@ export default {
         'pulse': 'pulse 1s ease-in-out infinite',
         'wordPulse': 'wordPulse 1s ease-in-out infinite',
         'cardAppear': 'cardAppear 0.6s ease-out',
+        'scan': 'scan 2s cubic-bezier(0.4, 0, 0.6, 1) infinite',
       },
       keyframes: {
         float: {
@@ -54,6 +55,10 @@ export default {
           from: { opacity: '0', transform: 'translateY(20px)' },
           to: { opacity: '1', transform: 'translateY(0)' },
         },
+        scan: {
+          '0%, 100%': { transform: 'translateY(-100%)' },
+          '50%': { transform: 'translateY(100%)' },
+        }
       },
       backdropFilter: {
         'none': 'none',

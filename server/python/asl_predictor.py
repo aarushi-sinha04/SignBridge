@@ -145,7 +145,7 @@ class ASLPredictor:
         label_encoder_path = os.path.join(model_dir, 'label_encoder.pkl')
         self.label_encoder = joblib.load(label_encoder_path)
 
-    def preprocess_frame(self, frame):
+    def preprocess_frame(self, frame, num_hands=2):
         # Convert frame to RGB
         rgb_frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
 
@@ -158,24 +158,30 @@ class ASLPredictor:
         # Extract hand landmarks
         landmarks = []
 
-        # Check if we have both hands
-        if len(results.multi_hand_landmarks) == 2:
-            # Process both hands
-            for hand_landmarks in results.multi_hand_landmarks:
-                hand_data = []
-                for landmark in hand_landmarks.landmark:
-                    hand_data.extend([landmark.x, landmark.y, landmark.z])
-                landmarks.extend(hand_data)
+        if num_hands == 1:
+            hand_landmarks = results.multi_hand_landmarks[0]
+            for landmark in hand_landmarks.landmark:
+                landmarks.extend([landmark.x, landmark.y, landmark.z])
         else:
-            # Process one hand and pad with zeros for the second hand
-            for hand_landmarks in results.multi_hand_landmarks:
-                for landmark in hand_landmarks.landmark:
-                    landmarks.extend([landmark.x, landmark.y, landmark.z])
+            # Check if we have both hands
+            if len(results.multi_hand_landmarks) >= 2:
+                # Process both hands
+                for i in range(2):
+                    hand_landmarks = results.multi_hand_landmarks[i]
+                    hand_data = []
+                    for landmark in hand_landmarks.landmark:
+                        hand_data.extend([landmark.x, landmark.y, landmark.z])
+                    landmarks.extend(hand_data)
+            else:
+                # Process one hand and pad with zeros for the second hand
+                for hand_landmarks in results.multi_hand_landmarks:
+                    for landmark in hand_landmarks.landmark:
+                        landmarks.extend([landmark.x, landmark.y, landmark.z])
 
-            # If we only have one hand, pad with zeros for the second hand
-            # Each hand has 21 landmarks with x, y, z coordinates (63 values)
-            if len(landmarks) == 63:  # One hand detected
-                landmarks.extend([0.0] * 63)  # Pad with zeros for the second hand
+                # If we only have one hand, pad with zeros for the second hand
+                # Each hand has 21 landmarks with x, y, z coordinates (63 values)
+                if len(landmarks) == 63:  # One hand detected
+                    landmarks.extend([0.0] * 63)  # Pad with zeros for the second hand
 
         landmarks = np.array(landmarks)
 
@@ -189,7 +195,7 @@ class ASLPredictor:
     def predict_alphabet(self, frame):
         cv2.imwrite("input_frame.jpg", frame)
 
-        landmarks = self.preprocess_frame(frame)
+        landmarks = self.preprocess_frame(frame, num_hands=1)
         if landmarks is None:
             print("No hand detected in the frame")
             return None
@@ -217,14 +223,9 @@ class ASLPredictor:
             return None
 
     def predict_word(self, frames):
-        # Since we're having issues with the model expecting 126 features but we only have 63,
-        # let's implement a simple fallback mechanism that returns one of the three words
-        # based on the number of frames and some basic heuristics
-
-        # First, try to preprocess frames to get landmarks
         landmarks = []
         for frame in frames:
-            frame_landmarks = self.preprocess_frame(frame)
+            frame_landmarks = self.preprocess_frame(frame, num_hands=2)
             if frame_landmarks is not None:
                 landmarks.append(frame_landmarks)
 
@@ -232,65 +233,6 @@ class ASLPredictor:
             print("No hand detected in any of the frames")
             return None
 
-        # Get the number of frames with detected hands
-        num_frames = len(landmarks)
-        print(f"Number of frames with detected hands: {num_frames}")
-
-        # Simple heuristic based on number of frames:
-        # - "hello" typically has more frames (waving motion)
-        # - "busy" typically has medium number of frames
-        # - "help" typically has fewer frames
-
-        # Adjusted thresholds based on observations
-        if num_frames > 25:
-            predicted_word = "hello"  # Waving motion typically has more frames
-        elif num_frames > 15:
-            predicted_word = "busy"   # Medium number of frames
-        else:
-            predicted_word = "help"   # Fewer frames
-
-        print(f"Predicted word using fallback mechanism: {predicted_word}")
-        return predicted_word
-
-    def predict_sentence(self, frames):
-        # Similar to predict_word, we'll implement a fallback mechanism for sentences
-        # based on the number of frames and some basic heuristics
-
-        # First, try to preprocess frames to get landmarks
-        landmarks = []
-        for frame in frames:
-            frame_landmarks = self.preprocess_frame(frame)
-            if frame_landmarks is not None:
-                landmarks.append(frame_landmarks)
-
-        if not landmarks:
-            print("No hand detected in any of the frames")
-            return None
-
-        # Get the number of frames with detected hands
-        num_frames = len(landmarks)
-        print(f"Number of frames with detected hands for sentence: {num_frames}")
-
-        # Simple heuristic based on number of frames:
-        # - "how are you" typically has fewer frames (simple question gesture)
-        # - "nice to meet you" typically has medium number of frames
-        # - "what is your name" typically has more frames (more complex question)
-
-        # Adjusted thresholds based on expected complexity
-        if num_frames > 35:
-            predicted_sentence = "what is your name"  # More complex, more frames
-        elif num_frames > 25:
-            predicted_sentence = "nice to meet you"   # Medium complexity
-        else:
-            predicted_sentence = "how are you"        # Simpler sentence
-
-        print(f"Predicted sentence using fallback mechanism: {predicted_sentence}")
-        return predicted_sentence
-
-        # The code below is the original implementation that's not working due to shape mismatch
-        # Keeping it commented for reference
-
-        '''
         # Pad or truncate to 30 frames
         landmarks = np.array(landmarks)
         print(f"Original landmarks shape: {landmarks.shape}")
@@ -320,7 +262,47 @@ class ASLPredictor:
         except Exception as e:
             print(f"Word prediction error: {e}")
             return None
-        '''
+
+    def predict_sentence(self, frames):
+        landmarks = []
+        for frame in frames:
+            frame_landmarks = self.preprocess_frame(frame, num_hands=2)
+            if frame_landmarks is not None:
+                landmarks.append(frame_landmarks)
+
+        if not landmarks:
+            print("No hand detected in any of the frames")
+            return None
+
+        # Pad or truncate to 60 frames
+        landmarks = np.array(landmarks)
+        print(f"Original landmarks shape: {landmarks.shape}")
+
+        if len(landmarks) < 60:
+            # Pad with zeros to reach 60 frames
+            pad_width = ((0, 60 - len(landmarks)), (0, 0))
+            landmarks = np.pad(landmarks, pad_width, mode='constant')
+        else:
+            # Truncate to 60 frames
+            landmarks = landmarks[:60]
+
+        # Reshape for model input (batch_size, sequence_length, features)
+        landmarks = landmarks.reshape(1, 60, -1)
+        print(f"Sentence landmarks shape for model input: {landmarks.shape}")
+
+        # Make prediction
+        try:
+            prediction = self.sentence_model.predict(landmarks)
+            print(f"Sentence prediction output: {prediction}")
+            predicted_class = np.argmax(prediction)
+
+            # Convert to sentence using sentence label encoder
+            predicted_sentence = self.sentence_label_encoder.inverse_transform([predicted_class])[0]
+            print(f"Predicted sentence: {predicted_sentence}")
+            return predicted_sentence
+        except Exception as e:
+            print(f"Sentence prediction error: {e}")
+            return None
 
     def release(self):
         self.hands.close()

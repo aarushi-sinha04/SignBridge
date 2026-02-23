@@ -60,7 +60,7 @@ export const AuthProvider = ({ children }) => {
       if (response.ok) {
         localStorage.setItem('authToken', data.token);
         setUser(data.user);
-        navigate('/animation');
+        navigate('/game');
         return { success: true };
       } else {
         return { success: false, error: data.message };
@@ -86,7 +86,7 @@ export const AuthProvider = ({ children }) => {
       if (response.ok) {
         localStorage.setItem('authToken', data.token);
         setUser(data.user);
-        navigate('/animation');
+        navigate('/game');
         return { success: true };
       } else {
         return { success: false, error: data.message };
